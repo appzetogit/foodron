@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 import multer from 'multer';
 
-const SETTINGS_UPLOAD_DIR = path.join(os.tmpdir(), 'blaze-global-settings-uploads');
+const SETTINGS_UPLOAD_DIR = path.join(os.tmpdir(), 'fudron-global-settings-uploads');
 
 if (!fs.existsSync(SETTINGS_UPLOAD_DIR)) {
     fs.mkdirSync(SETTINGS_UPLOAD_DIR, { recursive: true });

@@ -582,75 +582,75 @@
 }
 
 /* ==========================================================================
-   BLAZE PREMIUM THEME — Additive & Scoped (Phase 1: Dashboard only)
+   FUDRON PREMIUM THEME — Additive & Scoped (Phase 1: Dashboard only)
    ==========================================================================
-   Applying `.blaze-theme-scope` remaps the semantic design tokens to the
-   Blaze palette for that subtree ONLY. It does not modify :root or any other
+   Applying `.fudron-theme-scope` remaps the semantic design tokens to the
+   Fudron palette for that subtree ONLY. It does not modify :root or any other
    page, so the rest of Admin/Seller stays on the current theme until we roll
-   Blaze out globally in a later, separately-approved phase. Fully reversible.
+   Fudron out globally in a later, separately-approved phase. Fully reversible.
 */
-.blaze-theme-scope {
+.fudron-theme-scope {
   /* ------------------------------------------------------------------
-     BRANDING: reuse the EXISTING Blaze Food/Admin tokens exactly.
+     BRANDING: reuse the EXISTING Fudron Food/Admin tokens exactly.
      The semantic tokens (--primary, --secondary, --ring, --background,
      --card, --border, --muted, --accent, --foreground …) are intentionally
      NOT redeclared here, so they INHERIT the current Admin theme
      (#FF0000 family + warm paper). This guarantees the new Dashboard keeps
-     the identical Blaze brand identity — only layout/spacing/typography/
+     the identical Fudron brand identity — only layout/spacing/typography/
      shadows/animation are upgraded. No new red is introduced.
      ------------------------------------------------------------------ */
 
   /* Raw brand + status tokens mirrored from the existing Food theme so the
      shared components can reference them directly via var(). */
-  --blaze-primary: #FF0000;          /* = --primary / --color-orange-500 */
-  --blaze-primary-hover: #CC0000;    /* = --color-primary-hover / orange-600 */
-  --blaze-primary-active: #990000;   /* = --color-primary-dark / orange-700 */
-  --blaze-primary-light: #FFEDED;    /* = --secondary / --color-orange-50 */
-  --blaze-success: #2E7D32;          /* = --color-accent-green */
-  --blaze-warning: #F59E0B;
-  --blaze-info: #2563EB;
-  --blaze-danger: #DC2626;
+  --fudron-primary: #FF0000;          /* = --primary / --color-orange-500 */
+  --fudron-primary-hover: #CC0000;    /* = --color-primary-hover / orange-600 */
+  --fudron-primary-active: #990000;   /* = --color-primary-dark / orange-700 */
+  --fudron-primary-light: #FFEDED;    /* = --secondary / --color-orange-50 */
+  --fudron-success: #2E7D32;          /* = --color-accent-green */
+  --fudron-warning: #F59E0B;
+  --fudron-info: #2563EB;
+  --fudron-danger: #DC2626;
 
   /* ---- ONE radius system ---- */
-  --blaze-radius-card: 18px;
-  --blaze-radius-control: 12px;
-  --blaze-radius-pill: 9999px;
+  --fudron-radius-card: 18px;
+  --fudron-radius-control: 12px;
+  --fudron-radius-pill: 9999px;
 
   /* ---- ONE shadow scale ---- */
-  --blaze-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
-  --blaze-shadow-md: 0 8px 24px -12px rgba(16, 24, 40, 0.18);
-  --blaze-shadow-lg: 0 16px 40px -16px rgba(16, 24, 40, 0.22);
-  --blaze-shadow-primary: 0 16px 32px -16px rgba(255, 0, 0, 0.22);
+  --fudron-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --fudron-shadow-md: 0 8px 24px -12px rgba(16, 24, 40, 0.18);
+  --fudron-shadow-lg: 0 16px 40px -16px rgba(16, 24, 40, 0.22);
+  --fudron-shadow-primary: 0 16px 32px -16px rgba(255, 0, 0, 0.22);
 
   /* ---- ONE spacing rhythm ---- */
-  --blaze-gap: 1.5rem;
+  --fudron-gap: 1.5rem;
 }
 
 /* ==========================================================================
-   BLAZE DESIGN SYSTEM — Reusable utility classes (scoped)
+   FUDRON DESIGN SYSTEM — Reusable utility classes (scoped)
    ==========================================================================
    One surface, one typography ramp, one shadow scale, one radius. Every admin
    page consumes these via the shared components so the whole product matches.
 */
 
 /* Surfaces */
-.blaze-theme-scope .blaze-card {
+.fudron-theme-scope .fudron-card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: var(--blaze-radius-card);
-  box-shadow: var(--blaze-shadow-sm);
+  border-radius: var(--fudron-radius-card);
+  box-shadow: var(--fudron-shadow-sm);
 }
-.blaze-theme-scope .blaze-card-interactive {
+.fudron-theme-scope .fudron-card-interactive {
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
-.blaze-theme-scope .blaze-card-interactive:hover {
-  box-shadow: var(--blaze-shadow-primary);
+.fudron-theme-scope .fudron-card-interactive:hover {
+  box-shadow: var(--fudron-shadow-primary);
   border-color: rgba(255, 0, 0, 0.3);
   transform: translateY(-2px);
 }
 
 /* Typography ramp */
-.blaze-theme-scope .blaze-eyebrow {
+.fudron-theme-scope .fudron-eyebrow {
   font-size: 0.6875rem;
   line-height: 1rem;
   font-weight: 600;
@@ -658,62 +658,62 @@
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
-.blaze-theme-scope .blaze-title {
+.fudron-theme-scope .fudron-title {
   font-size: 1.75rem;
   line-height: 2.25rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--foreground);
 }
-.blaze-theme-scope .blaze-subtitle {
+.fudron-theme-scope .fudron-subtitle {
   font-size: 0.875rem;
   line-height: 1.25rem;
   color: var(--muted-foreground);
 }
-.blaze-theme-scope .blaze-section-title {
+.fudron-theme-scope .fudron-section-title {
   font-size: 1rem;
   line-height: 1.5rem;
   font-weight: 600;
   color: var(--foreground);
 }
-.blaze-theme-scope .blaze-section-subtitle {
+.fudron-theme-scope .fudron-section-subtitle {
   font-size: 0.8125rem;
   line-height: 1.125rem;
   color: var(--muted-foreground);
 }
-.blaze-theme-scope .blaze-label {
+.fudron-theme-scope .fudron-label {
   font-size: 0.8125rem;
   line-height: 1rem;
   font-weight: 600;
   color: var(--foreground);
 }
-.blaze-theme-scope .blaze-value {
+.fudron-theme-scope .fudron-value {
   font-size: 1.5rem;
   line-height: 1.875rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--foreground);
 }
-.blaze-theme-scope .blaze-body {
+.fudron-theme-scope .fudron-body {
   font-size: 0.875rem;
   line-height: 1.375rem;
   color: var(--foreground);
 }
-.blaze-theme-scope .blaze-muted {
+.fudron-theme-scope .fudron-muted {
   font-size: 0.8125rem;
   line-height: 1.125rem;
   color: var(--muted-foreground);
 }
 
-/* Premium scrollbar for Blaze scope */
-.blaze-theme-scope .blaze-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
-.blaze-theme-scope .blaze-scroll::-webkit-scrollbar-track { background: transparent; }
-.blaze-theme-scope .blaze-scroll::-webkit-scrollbar-thumb {
+/* Premium scrollbar for Fudron scope */
+.fudron-theme-scope .fudron-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.fudron-theme-scope .fudron-scroll::-webkit-scrollbar-track { background: transparent; }
+.fudron-theme-scope .fudron-scroll::-webkit-scrollbar-thumb {
   background: rgba(255, 0, 0, 0.18);
   border-radius: 9999px;
 }
-.blaze-theme-scope .blaze-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255, 0, 0, 0.32); }
-.blaze-theme-scope .blaze-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,0,0,0.2) transparent; }
+.fudron-theme-scope .fudron-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255, 0, 0, 0.32); }
+.fudron-theme-scope .fudron-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,0,0,0.2) transparent; }
 
 /* Utilities to hide scrollbars while preserving scrollability */
 .no-scrollbar::-webkit-scrollbar,
