@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import { MapPin, ArrowLeft } from "lucide-react"
 import { adminAPI } from "@food/api"
 import { getGoogleMapsApiKey } from "@food/utils/googleMapsApiKey"
-import { Loader } from "@googlemaps/js-api-loader"
+import { loadGoogleMaps as loadGoogleMapsSdk } from "@core/services/googleMapsLoader"
 import {
   formatUnitWithCoverage,
   resolveZoneAreaKm2,
@@ -93,44 +93,20 @@ const unitWithCoverage = useMemo(
       setMapError("")
       const apiKey = await getGoogleMapsApiKey()
       setGoogleMapsApiKey(apiKey || "")
-      
-      // Wait for Google Maps to be loaded from main.jsx if it's loading
-      let retries = 0
-      const maxRetries = 50
-      
-      while (!window.google && retries < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 100))
-        retries++
-      }
 
-      if (window.google && window.google.maps) {
-        debugLog("Google Maps already loaded, initializing map...")
-        // Wait a bit for DOM to be ready
-        setTimeout(() => {
-          initializeMap(window.google)
-        }, 100)
-        return
-      }
-
-      if (apiKey) {
-        debugLog("Loading Google Maps with Loader...")
-        const loader = new Loader({
-          apiKey: apiKey,
-          version: "weekly",
-          libraries: ["geometry"],
-        })
-
-        const google = await loader.load()
-        debugLog("Google Maps loaded, initializing map...")
-        // Wait a bit for DOM to be ready
-        setTimeout(() => {
-          initializeMap(google)
-        }, 100)
-      } else {
+      if (!apiKey) {
         debugLog("No API key found")
         setMapError("Google Maps API key not found")
         setMapLoading(false)
+        return
       }
+
+      await loadGoogleMapsSdk(apiKey)
+      debugLog("Google Maps loaded, initializing map...")
+      // Wait a bit for DOM to be ready
+      setTimeout(() => {
+        initializeMap(window.google)
+      }, 100)
     } catch (error) {
       debugError("Error loading Google Maps:", error)
       setMapError("Unable to load Google Maps SDK. Please verify API key and network.")

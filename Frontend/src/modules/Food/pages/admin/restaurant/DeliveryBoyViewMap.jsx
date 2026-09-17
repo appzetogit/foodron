@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { MapPin, ArrowLeft, Search, Bike } from "lucide-react"
 import { adminAPI } from "@food/api"
 import { getGoogleMapsApiKey } from "@food/utils/googleMapsApiKey"
-import { Loader } from "@googlemaps/js-api-loader"
+import { loadGoogleMaps as loadGoogleMapsSdk } from "@core/services/googleMapsLoader"
 import { subscribeAllDeliveryLocations } from "@food/realtimeTracking"
 import bikeLogo from "@food/assets/bikelogo.png"
 const debugLog = (...args) => {}
@@ -173,32 +173,14 @@ export default function DeliveryBoyViewMap() {
     try {
       const apiKey = await getGoogleMapsApiKey()
       setGoogleMapsApiKey(apiKey || "loaded")
-      
-      let retries = 0
-      const maxRetries = 50
-      
-      while (!window.google && retries < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 100))
-        retries++
-      }
 
-      if (window.google && window.google.maps) {
-        initializeMap(window.google)
+      if (!apiKey) {
+        setMapLoading(false)
         return
       }
 
-      if (apiKey) {
-        const loader = new Loader({
-          apiKey: apiKey,
-          version: "weekly",
-          libraries: ["places", "drawing", "geometry"]
-        })
-
-        const google = await loader.load()
-        initializeMap(google)
-      } else {
-        setMapLoading(false)
-      }
+      await loadGoogleMapsSdk(apiKey)
+      initializeMap(window.google)
     } catch (error) {
       debugError("Error loading Google Maps:", error)
       setMapLoading(false)

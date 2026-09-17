@@ -140,7 +140,6 @@ const AdminForgotPassword = lazy(() => import("@food/pages/admin/auth/AdminForgo
 
 
 const GlobalApplicationSettings = lazy(() => import("@/modules/common/admin/pages/GlobalApplicationSettings"));
-const ModuleManagement = lazy(() => import("@/modules/common/admin/pages/ModuleManagement"));
 
 function FoodAdminIndex() {
   const { user: authUser } = useAuth();
@@ -213,7 +212,6 @@ export default function AdminRouter() {
             <Route index element={<Navigate to="app" replace />} />
             <Route path="app" element={<GlobalApplicationSettings />} />
             <Route path="admin" element={<AdminProfile />} />
-            <Route path="modules" element={<ModuleManagement />} />
           </Route>
 
           {/* FOOD ADMIN - All food related routes nested here */}

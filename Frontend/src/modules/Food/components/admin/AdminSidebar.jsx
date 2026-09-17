@@ -392,7 +392,6 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
     })
   }, [activeMenuData])
 
-  const canAccessFoodModule = user?.role === "ADMIN" || hasAnyRootAccess(resolvedPermissions, "food")
   const canAccessGlobalModule = user?.role === "ADMIN" || hasAnyRootAccess(resolvedPermissions, "global")
 
   const switchAdminModule = (target) => {
@@ -694,19 +693,6 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
     return null
   }
 
-  const moduleTabs = [
-    {
-      key: "food",
-      label: "Food",
-      enabled: enabledModules.food,
-      visible: canAccessFoodModule,
-      active: !isCommonAdmin,
-      onClick: () => switchAdminModule("food")
-    }
-  ];
-
-  const visibleModuleTabs = moduleTabs.filter(tab => tab.enabled && tab.visible);
-
   return (
     <>
       <style>{`
@@ -863,54 +849,6 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
             </div>
           </div>
 
-          {/* Admin Panel Label */}
-          {!isCollapsed && (
-            <div className="mb-3 animate-[slideIn_0.4s_ease-out_0.1s_both] bg-transparent">
-              <h2 className="text-xs font-bold text-[#5C5247] uppercase tracking-wider text-left">
-                Admin Panel
-              </h2>
-              <div className="mt-2 rounded-xl border border-[#EDE8E0] bg-[#ffffffcc] p-1">
-                <div 
-                  className="grid gap-1"
-                  style={{ gridTemplateColumns: `repeat(${visibleModuleTabs.length}, minmax(0, 1fr))` }}
-                >
-                  {visibleModuleTabs.map(tab => (
-                    <button
-                      key={`${tab.key}-module-btn`}
-                      type="button"
-                      onClick={tab.onClick}
-                      className={cn(
-                        "rounded-lg px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-all",
-                        tab.active
-                          ? "bg-[#FF0000] text-white shadow-[0_4px_12px_rgba(255,0,0,0.2)]"
-                          : "text-[#5C5247] hover:text-[#1A1A1A] hover:bg-white/50"
-                      )}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-
-                  {canAccessGlobalModule && (
-                    <button
-                      key="global-settings-btn"
-                      type="button"
-                      onClick={() => switchAdminModule("common")}
-                      style={{ gridColumn: `span ${visibleModuleTabs.length} / span ${visibleModuleTabs.length}` }}
-                      className={cn(
-                        "rounded-lg px-2 py-1.5 mt-1 text-[11px] font-bold uppercase tracking-wide transition-all",
-                        isCommonAdmin
-                          ? "bg-[#FF0000] text-white shadow-[0_4px_12px_rgba(255,0,0,0.2)]"
-                          : "text-[#5C5247] hover:text-[#1A1A1A] hover:bg-white/50"
-                      )}
-                    >
-                      Global Settings
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Search Bar */}
           {!isCollapsed && (
             <div className="relative animate-[slideIn_0.4s_ease-out_0.2s_both]">
@@ -977,6 +915,34 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
 
               return null
             })
+          )}
+
+          {canAccessGlobalModule && (
+            <div className="mt-2 pt-2 border-t border-[#EDE8E0] animate-[fadeIn_0.4s_ease-out]">
+              <button
+                type="button"
+                onClick={() => switchAdminModule(isCommonAdmin ? "food" : "common")}
+                className={cn(
+                  "w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-all duration-200 ease-out text-left group text-xs",
+                  isCollapsed && "justify-center px-2",
+                  isCommonAdmin
+                    ? "bg-[#FFEDED] text-[#FF0000] border border-[#FFEDED]/30 font-semibold shadow-xs"
+                    : "text-[#5C5247] hover:bg-[#FAF7F2] hover:text-[#1A1A1A]"
+                )}
+                title={isCollapsed ? (isCommonAdmin ? "Food" : "Global Settings") : undefined}
+              >
+                {isCommonAdmin ? (
+                  <UtensilsCrossed className={cn("shrink-0 w-3.5 h-3.5", isCommonAdmin ? "text-[#FF0000]" : "text-[#5C5247] group-hover:text-[#1A1A1A]")} />
+                ) : (
+                  <Settings className="shrink-0 w-3.5 h-3.5 text-[#5C5247] group-hover:text-[#1A1A1A]" />
+                )}
+                {!isCollapsed && (
+                  <span className="text-left truncate text-xs font-medium">
+                    {isCommonAdmin ? "Back to Food" : "Global Settings"}
+                  </span>
+                )}
+              </button>
+            </div>
           )}
         </nav>
       </div>

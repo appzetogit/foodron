@@ -5,6 +5,7 @@ import { Input } from "@food/components/ui/input"
 import { Button } from "@food/components/ui/button"
 import { Label } from "@food/components/ui/label"
 import { getGoogleMapsApiKey } from "@food/utils/googleMapsApiKey"
+import { loadGoogleMaps as loadGoogleMapsSdk } from "@core/services/googleMapsLoader"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -120,29 +121,11 @@ async function loadGooglePlaces() {
 
   window.gm_authFailure = () => {}
 
-  const existing = document.getElementById("admin-google-maps-script")
-  if (existing) {
-    await new Promise((resolve, reject) => {
-      if (window.google?.maps?.places?.Autocomplete) {
-        resolve()
-        return
-      }
-      existing.addEventListener("load", resolve, { once: true })
-      existing.addEventListener("error", reject, { once: true })
-    })
-    return !!window.google?.maps?.places?.Autocomplete
+  try {
+    await loadGoogleMapsSdk(apiKey)
+  } catch {
+    return false
   }
-
-  await new Promise((resolve, reject) => {
-    const script = document.createElement("script")
-    script.id = "admin-google-maps-script"
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&v=weekly`
-    script.async = true
-    script.defer = true
-    script.onload = resolve
-    script.onerror = reject
-    document.head.appendChild(script)
-  })
 
   return !!window.google?.maps?.places?.Autocomplete
 }

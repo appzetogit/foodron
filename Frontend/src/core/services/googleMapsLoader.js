@@ -46,7 +46,8 @@ export const loadGoogleMaps = (apiKey) => {
 
     // Create script element
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry,places`;
+    script.id = 'app-google-maps-sdk';
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry,drawing&v=weekly`;
     script.async = true;
     script.defer = true;
 

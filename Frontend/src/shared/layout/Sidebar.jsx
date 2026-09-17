@@ -203,12 +203,12 @@ const SidebarContent = ({
                 <img src={logoUrl} alt={companyName} className="h-8 w-auto object-contain" />
               ) : (
                 <div className={cn("h-7 w-7 rounded-lg flex items-center justify-center text-white font-bold shadow-xs", isSellerPanel ? "bg-red-600" : "bg-primary")}>
-                  <span className="text-sm italic">{companyName?.charAt(0) || 'B'}</span>
+                  <span className="text-sm italic">{companyName?.charAt(0) || 'F'}</span>
                 </div>
               )}
               {!logoUrl && (
                 <h1 className={cn("text-base font-semibold tracking-tight leading-none", isLightSidebar ? "text-[#1c1c1e]" : "text-white")}>
-                  {companyName || 'Blaze'}
+                  {companyName || 'Fudron'}
                 </h1>
               )}
             </div>

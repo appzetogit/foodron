@@ -190,8 +190,8 @@ export async function sendRestaurantApprovalEmail(to, payload = {}) {
     const from = config.emailFrom || config.emailUser;
     const restaurantName = asSafeText(payload.restaurantName, "your restaurant");
     const ownerName = asSafeText(payload.ownerName, "Partner");
-    const subject = "Restaurant Approval Confirmed - Blaze";
-    const text = `Hi ${ownerName}, your restaurant "${restaurantName}" has been approved by admin. You can now log in and start accepting orders on Blaze.`;
+    const subject = "Restaurant Approval Confirmed - Fudron";
+    const text = `Hi ${ownerName}, your restaurant "${restaurantName}" has been approved by admin. You can now log in and start accepting orders on Fudron.`;
     const html = `
 <!DOCTYPE html>
 <html>
@@ -202,13 +202,13 @@ export async function sendRestaurantApprovalEmail(to, payload = {}) {
   <p>Your restaurant <strong>${restaurantName}</strong> has been approved by admin.</p>
   <p>You can now log in to your app and start accepting orders.</p>
   <hr style="border: none; border-top: 1px solid #eee; margin: 18px 0;">
-  <p style="color: #999; font-size: 12px;">Blaze Team</p>
+  <p style="color: #999; font-size: 12px;">Fudron Team</p>
 </body>
 </html>`;
 
     try {
         await trans.sendMail({
-            from: typeof from === "string" && from.includes("<") ? from : `Blaze <${from}>`,
+            from: typeof from === "string" && from.includes("<") ? from : `Fudron <${from}>`,
             to: recipient,
             subject,
             text,
@@ -239,8 +239,8 @@ export async function sendDeliveryApprovalEmail(to, payload = {}) {
 
     const from = config.emailFrom || config.emailUser;
     const partnerName = asSafeText(payload.name, "Partner");
-    const subject = "Delivery Partner Approval Confirmed - Blaze";
-    const text = `Hi ${partnerName}, your delivery partner profile has been approved by admin. You can now go online and start taking trips on Blaze.`;
+    const subject = "Delivery Partner Approval Confirmed - Fudron";
+    const text = `Hi ${partnerName}, your delivery partner profile has been approved by admin. You can now go online and start taking trips on Fudron.`;
     const html = `
 <!DOCTYPE html>
 <html>
@@ -251,13 +251,13 @@ export async function sendDeliveryApprovalEmail(to, payload = {}) {
   <p>Your delivery partner profile has been approved by admin.</p>
   <p>You can now open the app, go online, and start taking trips.</p>
   <hr style="border: none; border-top: 1px solid #eee; margin: 18px 0;">
-  <p style="color: #999; font-size: 12px;">Blaze Team</p>
+  <p style="color: #999; font-size: 12px;">Fudron Team</p>
 </body>
 </html>`;
 
     try {
         await trans.sendMail({
-            from: typeof from === "string" && from.includes("<") ? from : `Blaze <${from}>`,
+            from: typeof from === "string" && from.includes("<") ? from : `Fudron <${from}>`,
             to: recipient,
             subject,
             text,
@@ -293,10 +293,10 @@ export async function sendSellerStatusEmail(to, payload = {}) {
         payload.title,
         payload.status === "rejected" ? "Seller application update" : "Seller application approved"
     );
-    const body = asSafeText(payload.message, "There is an update on your Blaze seller account.");
+    const body = asSafeText(payload.message, "There is an update on your Fudron seller account.");
     const shopLine = shopName ? `Shop: ${shopName}` : "";
     const subject = heading;
-    const text = [`Hi ${sellerName},`, shopLine, body, "Open the Blaze seller app to see the latest status."]
+    const text = [`Hi ${sellerName},`, shopLine, body, "Open the Fudron seller app to see the latest status."]
         .filter(Boolean)
         .join("\n");
     const html = `
@@ -308,15 +308,15 @@ export async function sendSellerStatusEmail(to, payload = {}) {
   <p>Hi ${sellerName},</p>
   ${shopName ? `<p>Shop: <strong>${shopName}</strong></p>` : ""}
   <p>${body}</p>
-  <p>Open the Blaze seller app to see the latest status.</p>
+  <p>Open the Fudron seller app to see the latest status.</p>
   <hr style="border: none; border-top: 1px solid #eee; margin: 18px 0;">
-  <p style="color: #999; font-size: 12px;">Blaze Team</p>
+  <p style="color: #999; font-size: 12px;">Fudron Team</p>
 </body>
 </html>`;
 
     try {
         await trans.sendMail({
-            from: typeof from === "string" && from.includes("<") ? from : `Blaze <${from}>`,
+            from: typeof from === "string" && from.includes("<") ? from : `Fudron <${from}>`,
             to: recipient,
             subject,
             text,
@@ -346,7 +346,7 @@ export async function sendRestaurantRejectionEmail(to, payload = {}) {
     const restaurantName = asSafeText(payload.restaurantName, "your restaurant");
     const ownerName = asSafeText(payload.ownerName, "Partner");
     const reason = asSafeText(payload.reason, "Incomplete documents");
-    const subject = "Restaurant Application Update - Blaze";
+    const subject = "Restaurant Application Update - Fudron";
     const text = `Hi ${ownerName}, your restaurant "${restaurantName}" registration was not approved. Reason: ${reason}.`;
     const html = `
 <!DOCTYPE html>
@@ -359,13 +359,13 @@ export async function sendRestaurantRejectionEmail(to, payload = {}) {
   <p><strong>Reason:</strong> ${reason}</p>
   <p>You may update your details and re-apply if eligible.</p>
   <hr style="border: none; border-top: 1px solid #eee; margin: 18px 0;">
-  <p style="color: #999; font-size: 12px;">Blaze Team</p>
+  <p style="color: #999; font-size: 12px;">Fudron Team</p>
 </body>
 </html>`;
 
     try {
         await trans.sendMail({
-            from: typeof from === "string" && from.includes("<") ? from : `Blaze <${from}>`,
+            from: typeof from === "string" && from.includes("<") ? from : `Fudron <${from}>`,
             to: recipient,
             subject,
             text,
@@ -394,7 +394,7 @@ export async function sendDeliveryRejectionEmail(to, payload = {}) {
     const from = config.emailFrom || config.emailUser;
     const partnerName = asSafeText(payload.name, "Partner");
     const reason = asSafeText(payload.reason, "Application incomplete");
-    const subject = "Delivery Partner Application Update - Blaze";
+    const subject = "Delivery Partner Application Update - Fudron";
     const text = `Hi ${partnerName}, your delivery partner application was not approved. Reason: ${reason}.`;
     const html = `
 <!DOCTYPE html>
@@ -407,13 +407,13 @@ export async function sendDeliveryRejectionEmail(to, payload = {}) {
   <p><strong>Reason:</strong> ${reason}</p>
   <p>You may update your details and re-apply if eligible.</p>
   <hr style="border: none; border-top: 1px solid #eee; margin: 18px 0;">
-  <p style="color: #999; font-size: 12px;">Blaze Team</p>
+  <p style="color: #999; font-size: 12px;">Fudron Team</p>
 </body>
 </html>`;
 
     try {
         await trans.sendMail({
-            from: typeof from === "string" && from.includes("<") ? from : `Blaze <${from}>`,
+            from: typeof from === "string" && from.includes("<") ? from : `Fudron <${from}>`,
             to: recipient,
             subject,
             text,

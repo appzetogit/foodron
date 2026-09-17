@@ -18,21 +18,6 @@ export const commonAdminSidebarMenu = [
         path: "/admin/global-settings/admin",
         icon: "UserCog",
       },
-      {
-        type: "expandable",
-        label: "Customization",
-        permissionKey: "customization",
-        icon: "Palette",
-        subItems: [
-          {
-            type: "link",
-            label: "Modules",
-            permissionKey: "modules",
-            path: "/admin/global-settings/modules",
-            icon: "LayoutGrid",
-          }
-        ]
-      }
     ]
   }
 ];

@@ -209,8 +209,8 @@ export default function AdminForgotPassword() {
           <CardHeader className="pb-4">
             <div className="flex w-full items-center gap-4 sm:gap-5">
               <img 
-                src={logoUrl || "/logo.jpg"} 
-                alt="Blaze" 
+                src={logoUrl || "/logo.jpg"}
+                alt="Fudron"
                 className="h-16 w-auto shrink-0 rounded-lg object-contain" 
               />
               <div className="flex flex-col gap-1">

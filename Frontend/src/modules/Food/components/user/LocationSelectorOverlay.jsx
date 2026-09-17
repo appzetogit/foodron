@@ -13,7 +13,7 @@ import { useLocation as useGeoLocation } from "@food/hooks/useLocation"
 import { useProfile } from "@food/context/ProfileContext"
 import { toast } from "sonner"
 import { locationAPI, userAPI } from "@food/api"
-import { Loader } from '@googlemaps/js-api-loader'
+import { loadGoogleMaps as loadGoogleMapsSdk } from "@core/services/googleMapsLoader"
 import {
   fetchPlaceDetails,
   fetchPlacePredictions,
@@ -473,13 +473,8 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
 
     const initializeGoogleMap = async () => {
       try {
-        const loader = new Loader({
-          apiKey: GOOGLE_MAPS_API_KEY,
-          version: "weekly",
-          libraries: ["places"],
-        })
-
-        const google = await loader.load()
+        await loadGoogleMapsSdk(GOOGLE_MAPS_API_KEY)
+        const google = window.google
 
         if (!isMounted || !mapContainerRef.current) return
 

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { getGoogleMapsApiKey } from "@food/utils/googleMapsApiKey"
+import { loadGoogleMaps as loadGoogleMapsSdk } from "@core/services/googleMapsLoader"
 import { useNavigate } from "react-router-dom"
 import { Building2, Info, Tag, Upload, Calendar, FileText, MapPin, CheckCircle2, X, Image as ImageIcon, Clock, Loader2 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@food/components/ui/dialog"
@@ -749,37 +750,16 @@ export default function AddRestaurant() {
           debugError("Google Maps authentication failed.")
         }
 
-        // 4. Check for any existing script and force libraries=places
-        const scripts = Array.from(document.getElementsByTagName("script"))
-        const mapsScript = scripts.find(s => s.src?.includes("maps.googleapis.com/maps/api/js"))
-        
-        if (mapsScript && !mapsScript.src.includes("libraries=places")) {
-          mapsScript.remove()
-        } else if (mapsScript && mapsScript.src.includes("libraries=places")) {
-           for (let i = 0; i < 60; i++) {
-              if (window.google?.maps?.places?.Autocomplete) return true
-              if (cancelled) return false
-              await new Promise(r => setTimeout(r, 100))
-           }
+        // 4. Load via the shared singleton loader (never inject a competing script tag)
+        try {
+          await loadGoogleMapsSdk(apiKey)
+        } catch {
+          return false
         }
-
-        // 5. Create and append new script
-        return new Promise((resolve) => {
-          const script = document.createElement("script")
-          script.id = "google-maps-sdk"
-          script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&v=weekly`
-          script.async = true
-          script.defer = true
-          script.onload = () => {
-            setTimeout(() => {
-              const ok = !!window.google?.maps?.places?.Autocomplete
-              mapsScriptLoadedRef.current = ok
-              resolve(ok)
-            }, 200)
-          }
-          script.onerror = () => resolve(false)
-          document.head.appendChild(script)
-        })
+        if (cancelled) return false
+        const ok = !!window.google?.maps?.places?.Autocomplete
+        mapsScriptLoadedRef.current = ok
+        return ok
       }
 
       const parsePlace = (place) => {

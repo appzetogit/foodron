@@ -7,7 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { exportRestaurantsToPDF } from "@food/components/admin/restaurants/restaurantsExportUtils"
 import ApprovalAuditCard from "@food/components/admin/ApprovalAuditCard"
 import { getGoogleMapsApiKey } from "@food/utils/googleMapsApiKey"
-import { Loader } from "@googlemaps/js-api-loader"
+import { loadGoogleMaps as loadGoogleMapsSdk } from "@core/services/googleMapsLoader"
 import { useAuth } from "@core/context/AuthContext"
 import { getCurrentUser } from "@food/utils/auth"
 import { canPerformAdminPermissionAction, extractAdminPermissions, extractAdminRoleId, fetchAdminRolePermissions } from "@food/utils/adminPermissions"
@@ -232,7 +232,6 @@ export default function RestaurantsList() {
   })
   const locationSearchInputRef = useRef(null)
   const placesAutocompleteRef = useRef(null)
-  const googleMapsLoaderRef = useRef(null)
   const locationMapRef = useRef(null)
   const locationMapInstanceRef = useRef(null)
   const locationZonePolygonRef = useRef(null)
@@ -686,15 +685,7 @@ export default function RestaurantsList() {
     }
 
     try {
-      if (!googleMapsLoaderRef.current) {
-        googleMapsLoaderRef.current = new Loader({
-          apiKey,
-          version: "weekly",
-          libraries: ["places", "geometry"],
-        })
-      }
-
-      await googleMapsLoaderRef.current.load()
+      await loadGoogleMapsSdk(apiKey)
       return !!window.google?.maps?.places?.Autocomplete
     } catch (error) {
       debugError("Failed to load Google Maps:", error)

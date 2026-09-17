@@ -495,7 +495,7 @@ export const generateOrderInvoice = async (order, options = {}) => {
       ? `${order.date}, ${order.time}`
       : (order.date || new Date().toLocaleDateString())
 
-    const companyName = settings?.companyName || "Blaze"
+    const companyName = settings?.companyName || "Fudron"
     const logoUrl = settings?.userLogo?.url || settings?.logo?.url || undefined
     const logoDataUrl = await imageUrlToDataUrl(logoUrl)
 

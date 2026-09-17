@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { MapPin, ArrowLeft, Search } from "lucide-react"
 import { adminAPI } from "@food/api"
 import { getGoogleMapsApiKey } from "@food/utils/googleMapsApiKey"
-import { Loader } from "@googlemaps/js-api-loader"
+import { loadGoogleMaps as loadGoogleMapsSdk } from "@core/services/googleMapsLoader"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
@@ -99,36 +99,15 @@ export default function AllZonesMap() {
       setMapError("")
       const apiKey = await getGoogleMapsApiKey()
       setGoogleMapsApiKey(apiKey || "")
-      
-      // Wait for Google Maps to be loaded from main.jsx if it's loading
-      let retries = 0
-      const maxRetries = 50 // Wait up to 5 seconds (50 * 100ms)
-      
-      while (!window.google && retries < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 100))
-        retries++
-      }
 
-      // If Google Maps is already loaded (from main.jsx), use it directly
-      if (window.google && window.google.maps) {
-        initializeMap(window.google)
+      if (!apiKey) {
+        setMapError("Google Maps API key not found")
+        setMapLoading(false)
         return
       }
 
-      // If Google Maps is not loaded yet and we have an API key, use Loader as fallback
-      if (apiKey) {
-        const loader = new Loader({
-          apiKey: apiKey,
-          version: "weekly",
-          libraries: ["places", "drawing", "geometry"]
-        })
-
-        const google = await loader.load()
-        initializeMap(google)
-      } else {
-        setMapError("Google Maps API key not found")
-        setMapLoading(false)
-      }
+      await loadGoogleMapsSdk(apiKey)
+      initializeMap(window.google)
     } catch (error) {
       debugError("Error loading Google Maps:", error)
       setMapError("Unable to load Google Maps SDK. Please verify API key and network.")
