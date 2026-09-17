@@ -400,8 +400,28 @@ export default function AddZone() {
 
     const path = points.map(p => ({ lat: p.lat(), lng: p.lng() }));
 
-    // Polyline preview (no fill) so clicks inside the shape still reach the map
-    if (path.length >= 2) {
+    // Once there are enough points to form a shape, auto-close the preview into
+    // a polygon (last point connects back to the first) instead of an open line.
+    // Not clickable so clicks inside the shape still reach the map (adds more points).
+    // Points are shown in RADIAL order (same as Stop Drawing will save) so the
+    // preview is always a clean, non-crossing shape and the coverage-area figure
+    // is accurate — raw click order can self-intersect (a "bowtie") if points
+    // aren't clicked around the perimeter in sequence.
+    const orderedPath = path.length >= MIN_POINTS ? orderPointsRadially(points) : path;
+
+    if (path.length >= MIN_POINTS) {
+      polygonRef.current = new google.maps.Polygon({
+        paths: orderedPath,
+        strokeColor: "#9333ea",
+        strokeWeight: 2,
+        fillColor: "#9333ea",
+        fillOpacity: 0.12,
+        clickable: false,
+        zIndex: 1,
+      });
+      polygonRef.current.setMap(map);
+    } else if (path.length >= 2) {
+      // Fewer than MIN_POINTS: nothing to close yet, show an open preview line.
       polylineRef.current = new google.maps.Polyline({
         path,
         strokeColor: "#9333ea",
@@ -413,7 +433,9 @@ export default function AddZone() {
     }
 
     renderVertexMarkers(google, map, points);
-    setCoordinates(path.map(p => ({
+    // Coverage-area figure is computed from this — use the same radial order as
+    // the preview shape so it matches what's actually drawn (and what saves).
+    setCoordinates(orderedPath.map(p => ({
       latitude: parseFloat(p.lat.toFixed(6)),
       longitude: parseFloat(p.lng.toFixed(6)),
     })));
@@ -448,19 +470,20 @@ export default function AddZone() {
   const drawEditablePolygon = (google, map, coords) => {
     const path = coords.map(c => new google.maps.LatLng(c.latitude, c.longitude));
     const polygon = new google.maps.Polygon({
-      paths: path, 
-      strokeColor: "#9333ea", 
-      strokeOpacity: 0.8, 
+      paths: path,
+      strokeColor: "#9333ea",
+      strokeOpacity: 0.8,
       strokeWeight: 3,
-      fillColor: "#9333ea", 
+      fillColor: "#9333ea",
       fillOpacity: 0.35,
-      editable: true, 
-      draggable: false, 
+      // Native `editable: true` handles are tiny and easy to miss/get blocked by
+      // overlapping UI — use our own big draggable vertex markers instead (below).
+      editable: false,
+      draggable: false,
       clickable: false,
     });
     polygon.setMap(map);
     polygonRef.current = polygon;
-    pathMarkersRef.current = []; // IMPORTANT: no circle markers — they block the drag handles
 
     const sync = () => {
       const p = polygon.getPath();
@@ -473,6 +496,34 @@ export default function AddZone() {
     google.maps.event.addListener(pp, 'set_at', sync);
     google.maps.event.addListener(pp, 'insert_at', sync);
     google.maps.event.addListener(pp, 'remove_at', sync);
+
+    // Draggable vertex handles: bigger + more reliable than Google's native
+    // editable-polygon squares, so resizing the zone by dragging a point works
+    // consistently before Save (and in Edit mode, which reuses this function).
+    pathMarkersRef.current?.forEach(m => m.setMap(null));
+    const markers = [];
+    pp.forEach((latLng, i) => {
+      const marker = new google.maps.Marker({
+        position: latLng,
+        map,
+        draggable: true,
+        cursor: "move",
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: "#9333ea",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 2,
+        },
+        zIndex: 1000,
+        title: `Point ${i + 1}`,
+      });
+      marker.addListener('drag', () => pp.setAt(i, marker.getPosition()));
+      marker.addListener('dragend', () => pp.setAt(i, marker.getPosition()));
+      markers.push(marker);
+    });
+    pathMarkersRef.current = markers;
   };
 
   const drawExistingPolygon = (google, map, coords) => {
