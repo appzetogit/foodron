@@ -192,7 +192,7 @@ export const mapsRateLimiter = rateLimit({
 const ALLOWED_MAPS_CLIENT_ORIGINS = [
     'https://dukaanwallah.vercel.app',
     /^https:\/\/dukaanwallah.*\.vercel\.app$/,
-    'https://blaze-new-1.onrender.com',
+    'https://fudron-new-1.onrender.com',
     /^https:\/\/.*\.onrender\.com$/,
     'http://localhost:5173',
     'http://localhost:3000',
