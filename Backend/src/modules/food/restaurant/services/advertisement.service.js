@@ -4,9 +4,9 @@ import { FoodAdvertisement, ADS_TYPE_OPTIONS } from '../../admin/models/advertis
 import { FoodRestaurant } from '../models/restaurant.model.js';
 import {
     uploadImageBufferDetailed,
-    uploadBufferDetailed
-} from '../../../../services/cloudinary.service.js';
-import { v2 as cloudinary } from 'cloudinary';
+    uploadBufferDetailed,
+    destroyAsset
+} from '../../../../services/upload.service.js';
 
 function generateAdsId() {
     const suffix = Date.now().toString(36).toUpperCase().slice(-6);
@@ -149,12 +149,7 @@ function toAdminRequestView(ad, index = 0) {
 }
 
 async function destroyCloudinary(publicId, resourceType = 'image') {
-    if (!publicId) return;
-    try {
-        await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
-    } catch {
-        // ignore cleanup failures
-    }
+    await destroyAsset(publicId, resourceType);
 }
 
 async function uploadMediaFromFiles(files = {}) {
@@ -172,7 +167,9 @@ async function uploadMediaFromFiles(files = {}) {
         if (videoFile?.buffer) {
             const uploaded = await uploadBufferDetailed(videoFile.buffer, {
                 folder: 'food/advertisements',
-                resourceType: 'video'
+                resourceType: 'video',
+                mimeType: videoFile.mimetype,
+                originalName: videoFile.originalname
             });
             result.videoUrl = uploaded.secure_url;
             result.videoPublicId = uploaded.public_id;

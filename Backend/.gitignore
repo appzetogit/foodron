@@ -4,3 +4,7 @@ node_modules/
 dist/
 coverage/
 .DS_Store
+
+# Locally uploaded files (server-side upload flow) — never commit real uploads
+uploads/*
+!uploads/.gitkeep

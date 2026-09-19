@@ -1,8 +1,7 @@
 import { FoodExploreIcon } from '../models/exploreIcon.model.js';
-import { v2 as cloudinary } from 'cloudinary';
-import { uploadImageBufferDetailed } from '../../../../services/cloudinary.service.js';
+import { uploadImageBufferDetailed, destroyAsset } from '../../../../services/upload.service.js';
 
-const CLOUDINARY_FOLDER = 'food/explore-icons';
+const EXPLORE_ICON_FOLDER = 'food/explore-icons';
 
 /**
  * List all explore icons (admin). Sorted by sortOrder.
@@ -22,10 +21,10 @@ const getNextSortOrder = async () => {
 };
 
 /**
- * Upload buffer to Cloudinary and return { secure_url, public_id }.
+ * Upload buffer via the active upload provider and return { secure_url, public_id }.
  */
-const uploadImageToCloudinary = (buffer) => {
-    return uploadImageBufferDetailed(buffer, CLOUDINARY_FOLDER)
+const uploadExploreIconImage = (buffer) => {
+    return uploadImageBufferDetailed(buffer, EXPLORE_ICON_FOLDER)
         .then((result) => ({ secure_url: result.secure_url, public_id: result.public_id }));
 };
 
@@ -43,7 +42,7 @@ export const createExploreIcon = async (file, meta) => {
         throw new Error('Label is required');
     }
 
-    const { secure_url, public_id } = await uploadImageToCloudinary(file.buffer);
+    const { secure_url, public_id } = await uploadExploreIconImage(file.buffer);
     const sortOrder = await getNextSortOrder();
 
     const doc = await FoodExploreIcon.create({
@@ -75,9 +74,9 @@ export const updateExploreIcon = async (id, payload) => {
     if (payload?.file?.buffer) {
         try {
             if (doc.publicId) {
-                await cloudinary.uploader.destroy(doc.publicId).catch(() => {});
+                await destroyAsset(doc.publicId);
             }
-            const { secure_url, public_id } = await uploadImageToCloudinary(payload.file.buffer);
+            const { secure_url, public_id } = await uploadExploreIconImage(payload.file.buffer);
             updates.iconUrl = secure_url;
             updates.publicId = public_id;
         } catch (e) {
@@ -101,7 +100,7 @@ export const updateExploreIcon = async (id, payload) => {
 };
 
 /**
- * Delete explore icon and Cloudinary asset.
+ * Delete explore icon and its uploaded asset.
  */
 export const deleteExploreIcon = async (id) => {
     const doc = await FoodExploreIcon.findById(id);
@@ -109,11 +108,7 @@ export const deleteExploreIcon = async (id) => {
         return { deleted: false };
     }
     if (doc.publicId) {
-        try {
-            await cloudinary.uploader.destroy(doc.publicId);
-        } catch {
-            // ignore
-        }
+        await destroyAsset(doc.publicId);
     }
     await doc.deleteOne();
     return { deleted: true };

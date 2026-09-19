@@ -1,3 +1,5 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -13,6 +15,9 @@ import { requestIdMiddleware } from './middleware/requestId.js';
 import { healthCheck } from './config/health.js';
 import { config } from './config/env.js';
 import { corsOptions } from './config/cors.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const UPLOADS_DIR = path.resolve(__dirname, '..', config.uploadPath || 'uploads');
 
 const app = express();
 
@@ -46,6 +51,16 @@ app.use(helmet({
 
 // CORS — localhost, production domains, Vercel/Render previews, + CORS_ORIGIN/FRONTEND_URL
 app.use(cors(corsOptions));
+
+// Locally uploaded files (images/videos saved by the server-side upload flow).
+// Cross-Origin-Resource-Policy is relaxed here so the frontend (a different
+// origin in production) can actually load these as <img>/<video> sources.
+app.use('/uploads', express.static(UPLOADS_DIR, {
+    maxAge: '30d',
+    setHeaders: (res) => {
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    }
+}));
 
 app.use(morgan('dev'));
 app.use(express.json({

@@ -7,7 +7,7 @@ import { FoodEarningAddon } from '../../admin/models/earningAddon.model.js';
 import { FoodEarningAddonHistory } from '../../admin/models/earningAddonHistory.model.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { Transaction } from '../../../../core/payments/models/transaction.model.js';
-import { uploadImageBuffer } from '../../../../services/cloudinary.service.js';
+import { uploadImageBuffer } from '../../../../services/upload.service.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { getDeliveryCashLimitSettings } from '../../admin/services/admin.service.js';
 import { ensureDailyPassEligibility, activateDailyPass } from '../../subscriptions/services/wallet.service.js';

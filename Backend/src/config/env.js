@@ -68,6 +68,9 @@ export const config = {
 
     // Uploads
     uploadPath: process.env.UPLOAD_PATH || 'uploads/',
+    // 'local' (default): store files on this server's disk under uploadPath, served via /uploads.
+    // 'cloudinary': re-enable the (still-present, untouched) Cloudinary flow via CLOUDINARY_* vars.
+    uploadProvider: (process.env.UPLOAD_PROVIDER || 'local').trim().toLowerCase(),
     requestBodyLimit: process.env.REQUEST_BODY_LIMIT || '2mb',
 
     // Redis

@@ -1,6 +1,6 @@
 import { GlobalSettings } from '../models/settings.model.js';
 import { sendResponse } from '../../../utils/response.js';
-import { uploadImageBufferDetailed } from '../../../services/cloudinary.service.js';
+import { uploadImageBufferDetailed } from '../../../services/upload.service.js';
 import {
     getGlobalSettingsImagePreset,
     optimizeImageForUpload,
