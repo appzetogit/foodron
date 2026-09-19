@@ -119,6 +119,7 @@ router.patch('/categories/:id/make-global', checkPermission('food::food_manageme
 
 // ----- Restaurant Add-ons Approval -----
 router.get('/addons', checkPermission('food::food_management::foods::addons', 'view'), addonsApprovalController.getRestaurantAddons);
+router.post('/addons', checkPermission('food::food_management::foods::addons', 'create'), addonsApprovalController.createRestaurantAddon);
 router.patch('/addons/:id', checkPermission('food::food_management::foods::addons', 'edit'), addonsApprovalController.updateRestaurantAddon);
 router.patch('/addons/:id/approve', checkPermission('food::food_management::foods::addons', 'edit'), addonsApprovalController.approveRestaurantAddon);
 router.patch('/addons/:id/reject', checkPermission('food::food_management::foods::addons', 'edit'), addonsApprovalController.rejectRestaurantAddon);

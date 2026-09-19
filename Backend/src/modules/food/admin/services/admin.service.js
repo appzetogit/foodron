@@ -4718,6 +4718,88 @@ export async function getRestaurantAddonsAdmin(query = {}) {
     return { addons, total, page, limit };
 }
 
+/**
+ * Admin creates an add-on directly for a restaurant (mirrors admin createFood):
+ * no approval round-trip — it is published immediately.
+ */
+export async function createRestaurantAddonAdmin(body = {}, performer = null) {
+    const restaurantId = body.restaurantId;
+    if (!restaurantId || !mongoose.Types.ObjectId.isValid(String(restaurantId))) {
+        throw new ValidationError('Valid restaurantId is required');
+    }
+    const restaurant = await FoodRestaurant.findById(restaurantId)
+        .select('pureVegRestaurant restaurantName')
+        .lean();
+    if (!restaurant?._id) throw new ValidationError('Restaurant not found');
+
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (!name) throw new ValidationError('Add-on name is required');
+    if (name.length > 200) throw new ValidationError('Add-on name is too long');
+
+    const price = Number(body.price);
+    if (body.price === '' || body.price == null || !Number.isFinite(price) || price < 0) {
+        throw new ValidationError('Price must be a valid number (0 or more)');
+    }
+
+    const foodType = body.foodType === 'Non-Veg' ? 'Non-Veg' : 'Veg';
+    if (restaurant.pureVegRestaurant === true && foodType !== 'Veg') {
+        throw new ValidationError('Pure veg restaurants can only use veg add-ons');
+    }
+
+    const rid = new mongoose.Types.ObjectId(String(restaurantId));
+    const duplicate = await FoodAddon.findOne({
+        restaurantId: rid,
+        isDeleted: { $ne: true },
+        'draft.name': { $regex: `^${escapeRegex(name)}$`, $options: 'i' }
+    }).select('_id').lean();
+    if (duplicate?._id) throw new ValidationError('Add-on already exists for this restaurant');
+
+    const image = typeof body.image === 'string' ? body.image.trim() : '';
+    const images = Array.isArray(body.images)
+        ? body.images.map((img) => (typeof img === 'string' ? img : img?.url)).filter(Boolean).slice(0, 10)
+        : (image ? [image] : []);
+    if (!image && images.length === 0) throw new ValidationError('Add-on image is required');
+    const payload = {
+        name,
+        description: typeof body.description === 'string' ? body.description.trim() : '',
+        price: Math.round(price * 100) / 100,
+        image: image || images[0] || '',
+        images,
+        foodType
+    };
+
+    const now = new Date();
+    const doc = await FoodAddon.create({
+        restaurantId: rid,
+        draft: payload,
+        published: payload,
+        approvalStatus: 'approved',
+        rejectionReason: '',
+        requestedAt: now,
+        approvedAt: now,
+        rejectedAt: null,
+        approvedBy: performer,
+        isAvailable: body.isAvailable !== false,
+        isDeleted: false
+    });
+
+    try {
+        const { notifyOwnersWithInbox } = await import('../../../../core/notifications/ownerInboxNotify.js');
+        await notifyOwnersWithInbox(
+            [{ ownerType: 'RESTAURANT', ownerId: rid }],
+            {
+                title: 'New Add-on Added',
+                body: `Admin added the add-on "${name}" to your menu and it is now live.`,
+                data: { type: 'addon_approved', addonId: String(doc._id), restaurantId: String(rid) }
+            }
+        );
+    } catch (e) {
+        console.error('Failed to send admin-created addon notification:', e);
+    }
+
+    return doc.toObject();
+}
+
 export async function updateRestaurantAddonAdmin(addonId, body) {
     if (!addonId || !mongoose.Types.ObjectId.isValid(String(addonId))) return null;
     const _id = new mongoose.Types.ObjectId(String(addonId));

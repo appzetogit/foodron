@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { Eye, Loader2, Search, Trash2, Pencil } from "lucide-react"
+import { Eye, Loader2, Search, Trash2, Pencil, Plus } from "lucide-react"
 import { Switch } from "@food/components/ui/switch"
 import { adminAPI, uploadAPI } from "@food/api"
 import { toast } from "sonner"
@@ -79,6 +79,10 @@ export default function AddonsList() {
     return canPerformAdminPermissionAction(currentUser, resolvedPermissions, "food::food_management::foods::addons", "edit")
   }, [currentUser, resolvedPermissions])
 
+  const canCreate = useMemo(() => {
+    return canPerformAdminPermissionAction(currentUser, resolvedPermissions, "food::food_management::foods::addons", "create")
+  }, [currentUser, resolvedPermissions])
+
   const canDelete = useMemo(() => {
     return canPerformAdminPermissionAction(currentUser, resolvedPermissions, "food::food_management::foods::addons", "delete")
   }, [currentUser, resolvedPermissions])
@@ -92,7 +96,10 @@ export default function AddonsList() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [editingAddon, setEditingAddon] = useState(null)
   const [showEditModal, setShowEditModal] = useState(false)
-  const [editForm, setEditForm] = useState({ name: "", price: "", description: "", isAvailable: true })
+  const [formMode, setFormMode] = useState("edit") // "create" | "edit"
+  const [editForm, setEditForm] = useState({ restaurantId: "", name: "", price: "", description: "", foodType: "Veg", isAvailable: true })
+  const [restaurantOptions, setRestaurantOptions] = useState([])
+  const [refreshKey, setRefreshKey] = useState(0)
   const [editImagePreview, setEditImagePreview] = useState("")
   const [editImageFile, setEditImageFile] = useState(null)
 
@@ -123,7 +130,42 @@ export default function AddonsList() {
 
     const t = setTimeout(fetchAddons, 250)
     return () => clearTimeout(t)
-  }, [searchQuery])
+  }, [searchQuery, refreshKey])
+
+  // Restaurants for the "add add-on" form (loaded once, only when the admin can create).
+  useEffect(() => {
+    if (!canCreate) return undefined
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [active, inactive] = await Promise.all([
+          adminAPI.getRestaurants({ limit: 1000 }),
+          adminAPI.getRestaurants({ limit: 1000, status: "inactive" }).catch(() => null),
+        ])
+        const rows = [
+          ...(active?.data?.data?.restaurants || []),
+          ...(inactive?.data?.data?.restaurants || []),
+        ]
+        const seen = new Map()
+        rows.forEach((r) => {
+          const id = String(r?._id || r?.id || "")
+          if (id && !seen.has(id)) {
+            seen.set(id, {
+              id,
+              name: r?.restaurantName || r?.name || "Unknown Restaurant",
+              pureVeg: r?.pureVegRestaurant === true,
+            })
+          }
+        })
+        if (!cancelled) setRestaurantOptions(Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name)))
+      } catch {
+        if (!cancelled) setRestaurantOptions([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [canCreate])
 
   const filteredAddons = useMemo(() => {
     const result = Array.isArray(addons) ? [...addons] : []
@@ -143,11 +185,14 @@ export default function AddonsList() {
       toast.error("Permission denied")
       return
     }
+    setFormMode("edit")
     setEditingAddon(addon)
     setEditForm({
+      restaurantId: String(addon?.restaurantId || ""),
       name: addon?.draft?.name || addon?.name || "",
       price: addon?.draft?.price ?? addon?.price ?? "",
       description: addon?.draft?.description || addon?.description || "",
+      foodType: addon?.draft?.foodType === "Non-Veg" ? "Non-Veg" : "Veg",
       isAvailable: addon?.isAvailable !== false,
     })
     const img =
@@ -161,7 +206,75 @@ export default function AddonsList() {
     setShowEditModal(true)
   }
 
+  const handleOpenCreate = () => {
+    if (!canCreate) {
+      toast.error("Permission denied")
+      return
+    }
+    setFormMode("create")
+    setEditingAddon(null)
+    setEditForm({ restaurantId: "", name: "", price: "", description: "", foodType: "Veg", isAvailable: true })
+    setEditImagePreview("")
+    setEditImageFile(null)
+    setShowEditModal(true)
+  }
+
+  const selectedRestaurantOption = restaurantOptions.find((r) => r.id === editForm.restaurantId)
+
+  const handleCreateAddon = async () => {
+    if (!canCreate) {
+      toast.error("Permission denied")
+      return
+    }
+    if (!editForm.restaurantId) {
+      toast.error("Please select a restaurant")
+      return
+    }
+    if (!editImageFile) {
+      toast.error("Please select an add-on image")
+      return
+    }
+    if (!editForm.name.trim()) {
+      toast.error("Name is required")
+      return
+    }
+    const priceNum = Number(editForm.price)
+    if (editForm.price === "" || Number.isNaN(priceNum) || priceNum < 0) {
+      toast.error("Enter a valid price")
+      return
+    }
+    try {
+      setSubmittingAction(true)
+      let imageUrl = ""
+      if (editImageFile) {
+        const uploadRes = await uploadAPI.uploadMedia(editImageFile, { folder: "appzeto/admin/addons" })
+        imageUrl = uploadRes?.data?.data?.url || uploadRes?.data?.url || ""
+      }
+      await adminAPI.createRestaurantAddon({
+        restaurantId: editForm.restaurantId,
+        name: editForm.name.trim(),
+        price: priceNum,
+        description: editForm.description.trim(),
+        foodType: editForm.foodType === "Non-Veg" ? "Non-Veg" : "Veg",
+        isAvailable: editForm.isAvailable,
+        image: imageUrl,
+        images: imageUrl ? [imageUrl] : [],
+      })
+      toast.success("Add-on added successfully")
+      setShowEditModal(false)
+      setEditImageFile(null)
+      setEditImagePreview("")
+      setRefreshKey((k) => k + 1)
+    } catch (error) {
+      debugError("Create add-on failed:", error)
+      toast.error(error?.response?.data?.message || "Failed to add add-on")
+    } finally {
+      setSubmittingAction(false)
+    }
+  }
+
   const handleSaveEdit = async () => {
+    if (formMode === "create") return handleCreateAddon()
     if (!canEdit) {
       toast.error("Permission denied")
       return
@@ -190,6 +303,7 @@ export default function AddonsList() {
         name: editForm.name.trim(),
         price: priceNum,
         description: editForm.description.trim(),
+        foodType: editForm.foodType === "Non-Veg" ? "Non-Veg" : "Veg",
         isAvailable: editForm.isAvailable,
         image: imageUrl,
         images: imageUrl ? [imageUrl] : [],
@@ -258,10 +372,21 @@ export default function AddonsList() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Restaurant add-ons</h1>
-            <div className="text-sm text-slate-500 mt-1">Manage add-ons submitted by restaurants.</div>
+            <div className="text-sm text-slate-500 mt-1">Add add-ons for any restaurant and manage those submitted by restaurants.</div>
           </div>
 
-          <div className="flex items-center gap-2" />
+          <div className="flex items-center gap-2">
+            {canCreate && (
+              <button
+                type="button"
+                onClick={handleOpenCreate}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Add-on
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -451,9 +576,34 @@ export default function AddonsList() {
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
         <DialogContent className="max-w-md p-0 overflow-hidden">
           <DialogHeader className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-            <DialogTitle className="text-lg font-semibold text-slate-900">Edit Add-on</DialogTitle>
+            <DialogTitle className="text-lg font-semibold text-slate-900">{formMode === "create" ? "Add Add-on" : "Edit Add-on"}</DialogTitle>
           </DialogHeader>
-          <div className="p-6 space-y-4">
+          <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+            {formMode === "create" ? (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Restaurant</label>
+                <select
+                  value={editForm.restaurantId}
+                  onChange={(e) => {
+                    const id = e.target.value
+                    const opt = restaurantOptions.find((r) => r.id === id)
+                    setEditForm((prev) => ({
+                      ...prev,
+                      restaurantId: id,
+                      foodType: opt?.pureVeg ? "Veg" : prev.foodType,
+                    }))
+                  }}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white"
+                >
+                  <option value="">Select restaurant</option>
+                  {restaurantOptions.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             <div className="flex items-start gap-3">
               {editImagePreview ? (
                 <img
@@ -468,7 +618,9 @@ export default function AddonsList() {
                 </div>
               )}
               <div className="flex-1">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Change Image</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  {formMode === "create" ? (<>Image <span className="text-red-500">*</span></>) : "Change Image"}
+                </label>
                 <input
                   type="file"
                   accept="image/*"
@@ -480,7 +632,7 @@ export default function AddonsList() {
                     setEditImagePreview(preview)
                   }}
                   className="text-sm"
-                  disabled={!canEdit || submittingAction}
+                  disabled={(formMode === "create" ? !canCreate : !canEdit) || submittingAction}
                 />
                 <p className="text-xs text-slate-500">PNG, JPG, WEBP up to 5MB</p>
               </div>
@@ -517,6 +669,32 @@ export default function AddonsList() {
                 disabled={!canEdit}
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
+              <div className="flex gap-2">
+                {["Veg", "Non-Veg"].map((type) => {
+                  const lockedVeg = selectedRestaurantOption?.pureVeg && type === "Non-Veg"
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      disabled={lockedVeg}
+                      onClick={() => setEditForm((prev) => ({ ...prev, foodType: type }))}
+                      className={`flex-1 px-3 py-2 rounded-md border text-sm font-medium disabled:opacity-40 ${
+                        editForm.foodType === type
+                          ? "border-blue-600 bg-blue-50 text-blue-700"
+                          : "border-slate-300 text-slate-600"
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  )
+                })}
+              </div>
+              {selectedRestaurantOption?.pureVeg && (
+                <p className="text-xs text-slate-500 mt-1">Pure veg restaurant — only veg add-ons allowed.</p>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <Switch
                 checked={editForm.isAvailable}
@@ -537,10 +715,10 @@ export default function AddonsList() {
             <button
               type="button"
               onClick={handleSaveEdit}
-              disabled={submittingAction || !canEdit}
+              disabled={submittingAction || (formMode === "create" ? !canCreate : !canEdit)}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submittingAction ? "Saving..." : "Save"}
+              {submittingAction ? "Saving..." : formMode === "create" ? "Add Add-on" : "Save"}
             </button>
           </div>
         </DialogContent>

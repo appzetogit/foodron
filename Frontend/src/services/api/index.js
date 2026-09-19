@@ -1147,6 +1147,8 @@ export const adminAPI = {
     }),
 
   /** Restaurant add-ons approval (admin) */
+  createRestaurantAddon: (body) =>
+    apiClient.post("/food/admin/addons", body ?? {}, { contextModule: "admin" }),
   getRestaurantAddons: (params = {}) =>
     apiClient.get("/food/admin/addons", {
       params: params ?? {},

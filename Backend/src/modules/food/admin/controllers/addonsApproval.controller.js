@@ -13,6 +13,16 @@ export async function getRestaurantAddons(req, res, next) {
     }
 }
 
+export async function createRestaurantAddon(req, res, next) {
+    try {
+        const performer = extractPerformer(req.user);
+        const created = await adminService.createRestaurantAddonAdmin(req.body || {}, performer);
+        res.status(201).json({ success: true, message: 'Add-on created successfully', data: { addon: created } });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export async function approveRestaurantAddon(req, res, next) {
     try {
         const { id } = req.params;
