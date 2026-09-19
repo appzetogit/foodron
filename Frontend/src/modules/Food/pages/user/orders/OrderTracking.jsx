@@ -51,6 +51,7 @@ import {
 import { resolveImageUrl } from "@/shared/utils/resolveImageUrl"
 import circleIcon from "@food/assets/circleicon.png"
 import { RESTAURANT_PIN_SVG, CUSTOMER_PIN_SVG, RIDER_BIKE_SVG } from "@food/constants/mapIcons"
+import { getOrderDiscountBreakdown } from "@food/utils/menuDiscount"
 
 // ─── Fallback SVGs ────────────────────────────────────────────────────────────
 const DEFAULT_CUSTOMER_PIN = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="#10B981"><path d="M12 2C8.13 2 5 5.13 5 9c0 4.17 4.42 9.92 6.24 12.11.4.48 1.08.48 1.52 0C14.58 18.92 19 13.17 19 9c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5 14.5 7.62 14.5 9 13.38 11.5 12 11.5z"/><circle cx="12" cy="9" r="3" fill="#FFFFFF"/></svg>`;
@@ -2536,10 +2537,20 @@ export default function OrderTracking() {
                   <span className="text-gray-900 dark:text-slate-100 font-medium">₹{Number(val || 0).toFixed(2)}</span>
                 </div>
               ))}
-              {Number(order?.pricing?.discount || order?.discount) > 0 && (
+              {getOrderDiscountBreakdown(order?.pricing).menu > 0 && (
                 <div className="flex justify-between items-center text-sm text-green-600 dark:text-green-400 font-medium">
-                  <span>Discount Applied</span>
-                  <span>-₹{Number(order?.pricing?.discount || order?.discount).toFixed(2)}</span>
+                  <span>Menu Discount{getOrderDiscountBreakdown(order?.pricing).percentage > 0 ? ` (${getOrderDiscountBreakdown(order?.pricing).percentage}% off)` : ""}</span>
+                  <span>-₹{getOrderDiscountBreakdown(order?.pricing).menu.toFixed(2)}</span>
+                </div>
+              )}
+              {(getOrderDiscountBreakdown(order?.pricing).menu > 0
+                ? getOrderDiscountBreakdown(order?.pricing).coupon
+                : Number(order?.pricing?.discount || order?.discount || 0)) > 0 && (
+                <div className="flex justify-between items-center text-sm text-green-600 dark:text-green-400 font-medium">
+                  <span>{getOrderDiscountBreakdown(order?.pricing).menu > 0 ? "Coupon Discount" : "Discount Applied"}</span>
+                  <span>-₹{(getOrderDiscountBreakdown(order?.pricing).menu > 0
+                    ? getOrderDiscountBreakdown(order?.pricing).coupon
+                    : Number(order?.pricing?.discount || order?.discount || 0)).toFixed(2)}</span>
                 </div>
               )}
               <div className="pt-2 border-t border-gray-200 dark:border-white/10 flex justify-between items-center">

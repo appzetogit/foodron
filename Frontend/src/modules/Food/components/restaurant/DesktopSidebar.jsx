@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   LogOut,
   Gift,
+  Percent,
   Star,
   Edit,
   Building2,
@@ -87,6 +88,7 @@ export default function DesktopSidebar({ isCollapsed, onToggle }) {
         { name: "Menu categories", path: "/food/restaurant/menu-categories", icon: LayoutGrid },
         { name: "Item slot timings", path: "/food/restaurant/item-slot-timings", icon: Timer },
         { name: "Create coupons", path: "/food/restaurant/create-coupons", icon: Gift },
+        { name: "Menu discount", path: "/food/restaurant/menu-discount", icon: Percent },
       ],
     },
     {

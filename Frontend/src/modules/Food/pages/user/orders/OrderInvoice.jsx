@@ -10,6 +10,7 @@ import { Badge } from "@food/components/ui/badge"
 import { useOrders } from "@food/context/OrdersContext"
 import { orderAPI } from "@food/api"
 import { useCompanyName } from "@food/hooks/useCompanyName"
+import { getOrderDiscountBreakdown } from "@food/utils/menuDiscount"
 
 export default function OrderInvoice() {
   const companyName = useCompanyName()
@@ -77,6 +78,9 @@ export default function OrderInvoice() {
   const invoicePlatformFee = toMoney(pricing.platformFee ?? order.platformFee)
   const invoiceTax = toMoney(pricing.tax ?? order.tax)
   const invoiceDiscount = toMoney(pricing.discount ?? order.discount)
+  const discountBreakdown = getOrderDiscountBreakdown(pricing)
+  const invoiceMenuDiscount = toMoney(discountBreakdown.menu)
+  const invoiceCouponDiscount = toMoney(invoiceDiscount - invoiceMenuDiscount)
   const invoicePackaging = toMoney(pricing.packagingFee ?? order.packagingFee)
   const invoiceTotal = toMoney(pricing.total ?? order.total ?? order.totalAmount)
   const orderStatus = String(order.orderStatus || order.status || "placed")
@@ -337,10 +341,16 @@ export default function OrderInvoice() {
                   <span>Tax:</span>
                   <span>{formatMoney(invoiceTax)}</span>
                 </div>
-                {invoiceDiscount > 0 && (
+                {invoiceMenuDiscount > 0 && (
                   <div className="total-row flex justify-between text-xs sm:text-sm sm:text-base py-1 sm:py-2">
-                    <span>Discount:</span>
-                    <span>- {formatMoney(invoiceDiscount)}</span>
+                    <span>Menu Discount{discountBreakdown.percentage > 0 ? ` (${discountBreakdown.percentage}% off)` : ""}:</span>
+                    <span>- {formatMoney(invoiceMenuDiscount)}</span>
+                  </div>
+                )}
+                {invoiceCouponDiscount > 0 && (
+                  <div className="total-row flex justify-between text-xs sm:text-sm sm:text-base py-1 sm:py-2">
+                    <span>{invoiceMenuDiscount > 0 ? "Coupon Discount:" : "Discount:"}</span>
+                    <span>- {formatMoney(invoiceCouponDiscount)}</span>
                   </div>
                 )}
                 <div className="grand-total flex justify-between text-base sm:text-lg md:text-xl md:text-2xl pt-2 sm:pt-3 mt-2 sm:mt-3 border-t-2 border-[#FF0000]">

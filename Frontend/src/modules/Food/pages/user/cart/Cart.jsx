@@ -43,6 +43,7 @@ import { useCompanyName } from "@food/hooks/useCompanyName"
 import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability"
 import useAppBackNavigation from "@food/hooks/useAppBackNavigation"
 import { getRoadDistanceKm } from "@/shared/services/roadDistance"
+import { computeMenuDiscount } from "@food/utils/menuDiscount"
 import {
   parseGeoPoint,
   normalizeRestaurantLocation,
@@ -635,6 +636,27 @@ export default function Cart() {
   const restaurantId = cart.length > 0
     ? (restaurantData?._id || restaurantData?.restaurantId || cart[0]?.restaurantId || null)
     : null
+
+  // Active restaurant menu discount — used only for an instant preview; server pricing overrides it.
+  const [activeMenuDiscount, setActiveMenuDiscount] = useState(null)
+  useEffect(() => {
+    if (!restaurantId) {
+      setActiveMenuDiscount(null)
+      return undefined
+    }
+    let cancelled = false
+    restaurantAPI
+      .getPublicMenuDiscount(restaurantId)
+      .then((res) => {
+        if (!cancelled) setActiveMenuDiscount(res?.data?.data?.menuDiscount || null)
+      })
+      .catch(() => {
+        if (!cancelled) setActiveMenuDiscount(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [restaurantId])
 
   // Stable restaurant ID for addons fetch (memoized to prevent dependency array issues)
   // Prefer restaurantData IDs (more reliable) over slug from cart
@@ -1331,9 +1353,16 @@ const deliveryFeeBreakdownText = hasDistanceDeliveryBreakdown
   : null
 const platformFee = pricing?.platformFee ?? Number(feeSettings.platformFee || 0)
 const packagingFee = pricing?.packagingFee ?? Number(feeSettings.packagingFee || 0)
-const gstCharges = pricing?.tax ?? Math.round(subtotal * (Number(feeSettings.gstRate || 0) / 100))
+// Menu discount: server value when available, otherwise the same formula as the server for a preview.
+const menuDiscountPreview = pricing
+  ? 0
+  : computeMenuDiscount(subtotal, activeMenuDiscount).discountAmount
+const menuDiscountAmount = pricing ? Number(pricing.menuDiscount || 0) : menuDiscountPreview
+const menuDiscountPercent = Number(pricing?.menuDiscountInfo?.percentage || activeMenuDiscount?.percentage || 0)
+const gstCharges = pricing?.tax ?? Math.round(Math.max(0, subtotal - menuDiscountPreview) * (Number(feeSettings.gstRate || 0) / 100))
 // Never invent coupon caps — wait for server pricing for actual discount.
-const discount = pricing?.discount ?? 0
+const discount = pricing?.discount ?? menuDiscountPreview
+const couponDiscountAmount = Math.max(0, discount - menuDiscountAmount)
 const totalBeforeDiscount =
   subtotal + deliveryFee + platformFee + packagingFee + gstCharges + quickDeliveryFee
 const total = pricing?.total ?? (totalBeforeDiscount - discount)
@@ -2936,7 +2965,7 @@ return (
                     <Percent className="h-5 w-5 text-[#FF0000] mt-0.5" />
                     <div>
                       <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">'{appliedCoupon.code}' applied</p>
-                      <p className="text-xs text-[#FF0000] font-medium mt-0.5">You saved {RUPEE_SYMBOL}{discount}</p>
+                      <p className="text-xs text-[#FF0000] font-medium mt-0.5">You saved {RUPEE_SYMBOL}{couponDiscountAmount}</p>
                     </div>
                   </div>
                   <button onClick={handleRemoveCoupon} className="text-[#FF0000] text-xs font-semibold px-2 hover:underline">REMOVE</button>
@@ -3391,10 +3420,16 @@ return (
                     <span className="text-gray-600 dark:text-gray-400 border-b border-dashed border-gray-400 pb-[1px]">Government Taxes</span>
                     <span className="text-gray-800 dark:text-gray-200 font-medium">{RUPEE_SYMBOL}{gstCharges.toFixed(2)}</span>
                   </div>
-                  {discount > 0 && (
+                  {menuDiscountAmount > 0 && (
+                    <div className="flex justify-between text-sm text-emerald-600 font-medium">
+                      <span>Menu Discount{menuDiscountPercent > 0 ? ` (${menuDiscountPercent}% off)` : ""}</span>
+                      <span>-{RUPEE_SYMBOL}{menuDiscountAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {couponDiscountAmount > 0 && (
                     <div className="flex justify-between text-sm text-[#FF0000] font-medium">
-                      <span>Item Discount</span>
-                      <span>-{RUPEE_SYMBOL}{discount.toFixed(2)}</span>
+                      <span>Coupon Discount{appliedCoupon?.code ? ` (${appliedCoupon.code})` : ""}</span>
+                      <span>-{RUPEE_SYMBOL}{couponDiscountAmount.toFixed(2)}</span>
                     </div>
                   )}
 

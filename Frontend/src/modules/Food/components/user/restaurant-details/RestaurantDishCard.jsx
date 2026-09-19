@@ -7,6 +7,7 @@ import {
 } from "@food/utils/foodVariants";
 import ItemSlotAvailabilityNote from "@food/components/user/ItemSlotAvailabilityNote";
 import { FOOD_IMAGE_FALLBACK, RUPEE_SYMBOL } from "./restaurantDetailsUtils";
+import { computeMenuDiscount } from "@food/utils/menuDiscount";
 
 export default function RestaurantDishCard({
   item,
@@ -15,6 +16,7 @@ export default function RestaurantDishCard({
   disabled = false,
   isRecommended = false,
   isBookmarked = false,
+  menuDiscountPercent = 0,
   cardRef,
   onOpen,
   onBookmark,
@@ -25,6 +27,10 @@ export default function RestaurantDishCard({
   const isVeg = item.foodType === "Veg" || item.isVeg === true;
   const price = getFoodDisplayPrice(item);
   const variants = getFoodVariants(item);
+  const menuDiscountAmount = menuDiscountPercent > 0
+    ? computeMenuDiscount(price, { percentage: menuDiscountPercent }).discountAmount
+    : 0;
+  const discountedPrice = Math.max(0, price - menuDiscountAmount);
 
   let otherPrice = Number(item.otherPrice) || 0;
   if (variants.length > 0) {
@@ -102,9 +108,17 @@ export default function RestaurantDishCard({
           <div className="flex flex-col">
             <div className="flex items-baseline gap-1.5">
               <span className="text-[14px] font-bold text-[#FF0000] leading-none">
-                {RUPEE_SYMBOL}{Math.round(price)}
+                {RUPEE_SYMBOL}{Math.round(menuDiscountAmount > 0 ? discountedPrice : price)}
               </span>
-              {otherPrice > 0 && otherPrice > price && (
+              {menuDiscountAmount > 0 && (
+                <>
+                  <span className="text-[10px] text-gray-400 line-through font-medium leading-none">
+                    {RUPEE_SYMBOL}{Math.round(price)}
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-600 leading-none">{menuDiscountPercent}% OFF</span>
+                </>
+              )}
+              {menuDiscountAmount <= 0 && otherPrice > 0 && otherPrice > price && (
                 <span className="text-[10px] text-gray-400 line-through font-medium leading-none">
                   {RUPEE_SYMBOL}{Math.round(otherPrice)}
                 </span>

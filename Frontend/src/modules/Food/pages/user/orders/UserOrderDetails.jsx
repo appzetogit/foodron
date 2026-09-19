@@ -24,6 +24,7 @@ import { savePdfDocument } from "@shared/utils/fileDownload"
 import { formatScheduledAtShort } from "@food/utils/scheduleTime"
 import { isFoodQuickOrder, formatQuickEtaWindow } from "@food/utils/quickDelivery"
 import { getLifecycleDisplay } from "@food/utils/orderLifecycleDisplay"
+import { getOrderDiscountBreakdown } from "@food/utils/menuDiscount"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
@@ -239,6 +240,9 @@ export default function UserOrderDetails() {
     platformFee: toAmount(pricing.platformFee),
     subscriptionFee: toAmount(pricing.subscriptionFee),
     discount: toAmount(pricing.discount),
+    menuDiscount: getOrderDiscountBreakdown(pricing).menu,
+    menuDiscountPercent: getOrderDiscountBreakdown(pricing).percentage,
+    couponDiscount: getOrderDiscountBreakdown(pricing).coupon,
     total: toAmount(pricing.total),
   }
 
@@ -419,8 +423,14 @@ export default function UserOrderDetails() {
       if (billBreakdown.subscriptionFee > 0) {
         billRows.push(['Subscription / other fees', formatPdfAmount(billBreakdown.subscriptionFee)])
       }
-      if (billBreakdown.discount > 0) {
-        billRows.push(['Discount', `- ${formatPdfAmount(billBreakdown.discount)}`])
+      if (billBreakdown.menuDiscount > 0) {
+        billRows.push([
+          billBreakdown.menuDiscountPercent > 0 ? `Menu discount (${billBreakdown.menuDiscountPercent}% off)` : 'Menu discount',
+          `- ${formatPdfAmount(billBreakdown.menuDiscount)}`,
+        ])
+      }
+      if (billBreakdown.couponDiscount > 0) {
+        billRows.push(['Coupon discount', `- ${formatPdfAmount(billBreakdown.couponDiscount)}`])
       }
 
       billRows.forEach(([label, value]) => {
@@ -743,11 +753,21 @@ export default function UserOrderDetails() {
                 </span>
               </div>
             )}
-            {billBreakdown.discount > 0 && (
+            {billBreakdown.menuDiscount > 0 && (
               <div className="flex justify-between">
-                <span className="text-gray-500">Discount</span>
+                <span className="text-gray-500">
+                  Menu discount{billBreakdown.menuDiscountPercent > 0 ? ` (${billBreakdown.menuDiscountPercent}% off)` : ""}
+                </span>
                 <span className="text-emerald-600">
-                  - ₹{billBreakdown.discount.toFixed(2)}
+                  - ₹{billBreakdown.menuDiscount.toFixed(2)}
+                </span>
+              </div>
+            )}
+            {billBreakdown.couponDiscount > 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Coupon discount</span>
+                <span className="text-emerald-600">
+                  - ₹{billBreakdown.couponDiscount.toFixed(2)}
                 </span>
               </div>
             )}

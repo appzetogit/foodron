@@ -721,6 +721,7 @@ export default function ExploreMore() {
     { id: 4, label: "Menu categories", icon: Settings, route: "/restaurant/menu-categories" },
     { id: 6, label: "Item slot timings", icon: Clock, route: "/restaurant/item-slot-timings" },
     { id: 5, label: "Create Coupons", icon: Gift, route: "/restaurant/create-coupons" },
+    { id: 8, label: "Menu Discount", icon: Gift, route: "/restaurant/menu-discount" },
     { id: 7, label: "Advertisements", icon: Megaphone, route: "/restaurant/advertisements" },
   ]
 

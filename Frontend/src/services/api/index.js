@@ -1206,6 +1206,17 @@ export const adminAPI = {
     apiClient.get("/food/admin/restaurant-coupons", { contextModule: "admin" }),
   updateRestaurantCouponStatus: (id, status) =>
     apiClient.patch(`/food/admin/restaurant-coupons/${id}/status`, { status }, { contextModule: "admin" }),
+  /** Restaurant menu discounts (admin sets % + admin/restaurant bear split) */
+  getMenuDiscounts: (params = {}) =>
+    apiClient.get("/food/admin/menu-discounts", { params, contextModule: "admin" }),
+  createMenuDiscount: (body) =>
+    apiClient.post("/food/admin/menu-discounts", body ?? {}, { contextModule: "admin" }),
+  updateMenuDiscount: (id, body) =>
+    apiClient.put(`/food/admin/menu-discounts/${String(id)}`, body ?? {}, { contextModule: "admin" }),
+  setMenuDiscountStatus: (id, isActive) =>
+    apiClient.patch(`/food/admin/menu-discounts/${String(id)}/status`, { isActive }, { contextModule: "admin" }),
+  deleteMenuDiscount: (id) =>
+    apiClient.delete(`/food/admin/menu-discounts/${String(id)}`, { contextModule: "admin" }),
   getAdvertisements: () =>
     apiClient.get("/food/admin/advertisements", { contextModule: "admin" }),
   getAdvertisementRequests: () =>
@@ -1799,6 +1810,9 @@ export const restaurantAPI = {
   /** Public: get single approved restaurant by id or slug */
   getRestaurantById: (id, config = {}) =>
     apiClient.get(`/food/restaurant/restaurants/${String(id)}`, { ...config }),
+  /** Public: discount currently applied to a restaurant's menu (uncached, date-window aware) */
+  getPublicMenuDiscount: (id, config = {}) =>
+    apiClient.get(`/food/restaurant/restaurants/${String(id)}/menu-discount`, { ...config }),
   /** Public: get approved menu by restaurant id or slug */
   getMenuByRestaurantId: (id, config = {}) =>
     getPublicRestaurantMenuOnce(id, config),
@@ -1882,6 +1896,17 @@ export const restaurantAPI = {
     apiClient.delete(`/food/restaurant/coupons/${String(id)}`, {
       contextModule: "restaurant",
     }),
+  /** Menu discounts (restaurant panel — restaurant bears 100%) */
+  getMenuDiscounts: (params = {}) =>
+    apiClient.get("/food/restaurant/menu-discounts", { params, contextModule: "restaurant" }),
+  createMenuDiscount: (body) =>
+    apiClient.post("/food/restaurant/menu-discounts", body ?? {}, { contextModule: "restaurant" }),
+  updateMenuDiscount: (id, body) =>
+    apiClient.put(`/food/restaurant/menu-discounts/${String(id)}`, body ?? {}, { contextModule: "restaurant" }),
+  setMenuDiscountStatus: (id, isActive) =>
+    apiClient.patch(`/food/restaurant/menu-discounts/${String(id)}/status`, { isActive }, { contextModule: "restaurant" }),
+  deleteMenuDiscount: (id) =>
+    apiClient.delete(`/food/restaurant/menu-discounts/${String(id)}`, { contextModule: "restaurant" }),
   getAdvertisements: () =>
     apiClient.get("/food/restaurant/advertisements", {
       contextModule: "restaurant",

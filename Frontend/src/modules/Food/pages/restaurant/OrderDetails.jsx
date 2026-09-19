@@ -25,6 +25,7 @@ import {
 } from "lucide-react"
 import ResendNotificationButton from "@food/components/restaurant/ResendNotificationButton"
 import { getCancellationDisplayLabel } from "@food/utils/cancellationDisplay"
+import { getOrderDiscountBreakdown } from "@food/utils/menuDiscount"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
@@ -115,6 +116,7 @@ export default function OrderDetails({ orderId: propOrderId, isSidebar = false, 
           const referralDiscount = firstNumber(pricing.referralDiscount, order.referralDiscount) ?? 0
           const restaurantCommission = firstNumber(pricing.restaurantCommission, order.restaurantCommission) ?? 0
           const quickRestaurantShare = firstNumber(pricing.quickRestaurantShare, order.quickRestaurantShare) ?? 0
+          const discountBreakdown = getOrderDiscountBreakdown(pricing)
 
           const total =
             firstNumber(
@@ -230,6 +232,11 @@ export default function OrderDetails({ orderId: propOrderId, isSidebar = false, 
               discount,
               couponDiscount,
               referralDiscount,
+              menuDiscount: discountBreakdown.menu,
+              menuDiscountPercent: discountBreakdown.percentage,
+              menuDiscountPeriod: discountBreakdown.period,
+              menuAdminShare: discountBreakdown.adminShare,
+              menuRestaurantShare: discountBreakdown.restaurantShare,
               restaurantCommission,
               quickRestaurantShare,
               total,
@@ -704,10 +711,34 @@ export default function OrderDetails({ orderId: propOrderId, isSidebar = false, 
               <span className="text-sm text-red-700">Commission Paid</span>
               <span className="text-sm text-red-700">{formatDiscount(orderData.billing.restaurantCommission)}</span>
             </div>
-            {Number(orderData.billing.discount) > 0 && (
+            {Number(orderData.billing.menuDiscount) > 0 && (
+              <div className="mb-3 rounded-lg bg-emerald-50 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-emerald-800">
+                    Menu discount given to customer
+                    {Number(orderData.billing.menuDiscountPercent) > 0 ? ` (${orderData.billing.menuDiscountPercent}%)` : ""}
+                  </span>
+                  <span className="text-sm text-emerald-800">{formatDiscount(orderData.billing.menuDiscount)}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between">
+                  <span className="text-xs text-red-700">Your share (deducted from your earning)</span>
+                  <span className="text-xs font-semibold text-red-700">{formatDiscount(orderData.billing.menuRestaurantShare)}</span>
+                </div>
+                {Number(orderData.billing.menuAdminShare) > 0 && (
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="text-xs text-gray-600">Admin-funded share (not deducted from you)</span>
+                    <span className="text-xs text-gray-600">{formatMoney(orderData.billing.menuAdminShare)}</span>
+                  </div>
+                )}
+                {orderData.billing.menuDiscountPeriod && (
+                  <p className="mt-1 text-[11px] text-gray-500">Offer period: {orderData.billing.menuDiscountPeriod}</p>
+                )}
+              </div>
+            )}
+            {Math.max(0, Number(orderData.billing.discount) - Number(orderData.billing.menuDiscount || 0)) > 0 && (
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-green-700">Discount</span>
-                <span className="text-sm text-green-700">{formatDiscount(orderData.billing.discount)}</span>
+                <span className="text-sm text-green-700">Coupon discount</span>
+                <span className="text-sm text-green-700">{formatDiscount(Math.max(0, Number(orderData.billing.discount) - Number(orderData.billing.menuDiscount || 0)))}</span>
               </div>
             )}
             <div className="my-3 border-t border-gray-100"></div>
@@ -732,7 +763,8 @@ export default function OrderDetails({ orderId: propOrderId, isSidebar = false, 
                 Math.max(0, (Number(orderData.billing.itemSubtotal) || 0) + 
                 (Number(orderData.billing.packagingFee) || 0) + 
                 (Number(orderData.billing.quickRestaurantShare) || 0) - 
-                (Number(orderData.billing.restaurantCommission) || 0))
+                (Number(orderData.billing.restaurantCommission) || 0) -
+                (Number(orderData.billing.menuRestaurantShare) || 0))
               )}</span>
             </div>
           </div>

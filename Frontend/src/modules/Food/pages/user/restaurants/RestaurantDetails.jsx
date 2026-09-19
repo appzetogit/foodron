@@ -44,6 +44,7 @@ import { RestaurantDetailSkeleton } from "@food/components/ui/loading-skeletons"
 import RestaurantDetailsHero from "@food/components/user/restaurant-details/RestaurantDetailsHero"
 import RestaurantDetailsSummary from "@food/components/user/restaurant-details/RestaurantDetailsSummary"
 import RestaurantDetailsOffers from "@food/components/user/restaurant-details/RestaurantDetailsOffers"
+import MenuDiscountBanner from "@food/components/user/restaurant-details/MenuDiscountBanner"
 import RestaurantDetailsMenuToolbar from "@food/components/user/restaurant-details/RestaurantDetailsMenuToolbar"
 import RestaurantDishCard from "@food/components/user/restaurant-details/RestaurantDishCard"
 import { FOOD_IMAGE_FALLBACK, RUPEE_SYMBOL, buildRestaurantGallery } from "@food/components/user/restaurant-details/restaurantDetailsUtils"
@@ -173,6 +174,7 @@ function RestaurantDetailsContent() {
 
   // Restaurant data state
   const [restaurant, setRestaurant] = useState(null)
+  const [menuDiscount, setMenuDiscount] = useState(null)
   const [loadingRestaurant, setLoadingRestaurant] = useState(true)
   const [restaurantError, setRestaurantError] = useState(null)
   const fetchedRestaurantRef = useRef(false) // Track if restaurant has been fetched for current slug
@@ -1810,6 +1812,27 @@ function RestaurantDetailsContent() {
     }
   }, [restaurant, targetDishId])
 
+  // Active restaurant-wide menu discount (uncached endpoint — date-window sensitive).
+  const menuDiscountRestaurantKey = restaurant?._id || restaurant?.restaurantId || null
+  useEffect(() => {
+    if (!menuDiscountRestaurantKey) {
+      setMenuDiscount(null)
+      return undefined
+    }
+    let cancelled = false
+    restaurantAPI
+      .getPublicMenuDiscount(menuDiscountRestaurantKey)
+      .then((res) => {
+        if (!cancelled) setMenuDiscount(res?.data?.data?.menuDiscount || null)
+      })
+      .catch(() => {
+        if (!cancelled) setMenuDiscount(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [menuDiscountRestaurantKey])
+
   // Highlight offers/texts for the blue offer line
   const highlightOffers = [
     "Upto 50% OFF",
@@ -1908,6 +1931,7 @@ function RestaurantDetailsContent() {
         highlighted={highlightedDishId === item.id}
         disabled={shouldShowGrayscale}
         isRecommended={isRecommendedItem(item)}
+        menuDiscountPercent={Number(menuDiscount?.percentage) || 0}
         isBookmarked={isDishFavorite(item.id, restaurantId)}
         cardRef={(node) => {
           if (node) dishCardRefs.current[item.id] = node
@@ -1961,6 +1985,8 @@ function RestaurantDetailsContent() {
         isRestaurantOffline={isRestaurantOffline}
         isOutOfService={isOutOfService}
       />
+
+      <MenuDiscountBanner menuDiscount={menuDiscount} />
 
       <RestaurantDetailsMenuToolbar
         activeFilterCount={activeFilterCount}

@@ -649,7 +649,11 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order: orderProp
               )}
               {order.itemDiscount !== undefined && order.itemDiscount > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Discount</span>
+                  <span className="text-slate-600">
+                    {Number(order.menuDiscount) > 0
+                      ? `Menu Discount${Number(order.menuDiscountPercent) > 0 ? ` (${order.menuDiscountPercent}% off)` : ""}`
+                      : "Discount"}
+                  </span>
                   <span className="font-medium text-emerald-600">-₹{Number(order.itemDiscount || 0).toFixed(2)}</span>
                 </div>
               )}
@@ -657,6 +661,31 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order: orderProp
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-600">Coupon Discount</span>
                   <span className="font-medium text-emerald-600">-₹{Number(order.couponDiscount || 0).toFixed(2)}</span>
+                </div>
+              )}
+              {Number(order.menuDiscount) > 0 && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 space-y-1.5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                    Menu discount split
+                    {order.menuDiscountSource ? ` · set by ${order.menuDiscountSource}` : ""}
+                  </p>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">
+                      Deducted from admin earning
+                      <span className="ml-1 text-[10px] text-slate-400">({Number(order.menuAdminBearPercentage || 0).toFixed(1)}%)</span>
+                    </span>
+                    <span className="font-medium text-amber-700">-₹{Number(order.menuAdminShare || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">
+                      Deducted from restaurant earning
+                      <span className="ml-1 text-[10px] text-slate-400">({Number(order.menuRestaurantBearPercentage || 0).toFixed(1)}%)</span>
+                    </span>
+                    <span className="font-medium text-amber-700">-₹{Number(order.menuRestaurantShare || 0).toFixed(2)}</span>
+                  </div>
+                  {order.menuDiscountPeriod && (
+                    <p className="text-[11px] text-slate-500">Offer period: {order.menuDiscountPeriod}</p>
+                  )}
                 </div>
               )}
               {order.deliveryCharge !== undefined && (

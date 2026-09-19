@@ -113,6 +113,23 @@ const pricingSchema = new mongoose.Schema(
         platformFee: { type: Number, default: 0, min: 0 },
         handlingFee: { type: Number, default: 0, min: 0 },
         discount: { type: Number, default: 0, min: 0 },
+        /** Coupon part of `discount` (discount = couponDiscount + menuDiscount). */
+        couponDiscount: { type: Number, default: 0, min: 0 },
+        /** Restaurant menu discount (auto-applied, split admin/restaurant in menuDiscountInfo). */
+        menuDiscount: { type: Number, default: 0, min: 0 },
+        menuDiscountInfo: {
+            discountId: { type: mongoose.Schema.Types.ObjectId, default: null },
+            percentage: { type: Number, default: 0, min: 0 },
+            source: { type: String, enum: ['admin', 'restaurant', null], default: null },
+            scheduleType: { type: String, default: null },
+            startDate: { type: String, default: null },
+            endDate: { type: String, default: null },
+            adminBearPercentage: { type: Number, default: 0, min: 0 },
+            restaurantBearPercentage: { type: Number, default: 0, min: 0 },
+            discountAmount: { type: Number, default: 0, min: 0 },
+            adminShare: { type: Number, default: 0, min: 0 },
+            restaurantShare: { type: Number, default: 0, min: 0 },
+        },
         couponCode: { type: String, default: null, trim: true },
         appliedCoupon: {
             code: { type: String, default: null, trim: true },
@@ -529,6 +546,9 @@ const LOCKED_MONEY_PATHS = [
     'pricing.restaurantDeliveryFee',
     'pricing.platformFee',
     'pricing.discount',
+    'pricing.couponDiscount',
+    'pricing.menuDiscount',
+    'pricing.menuDiscountInfo',
     'pricing.restaurantCommissionPercentage',
     'pricing.restaurantCommission',
     'pricing.total',

@@ -691,6 +691,24 @@ export default function PointOfSale() {
                     <span className="text-sm text-[#8a94aa]">Discount</span>
                     <span className="text-sm font-semibold text-[#334257]">{formatCurrency(paymentSummary?.discount || 0)}</span>
                   </div>
+                  {Number(paymentSummary?.menuDiscount) > 0 && (
+                    <>
+                      <div className="flex justify-between items-center py-2 border-b border-[#e3e6ef]">
+                        <span className="text-sm text-[#8a94aa]">
+                          Menu Discount{Number(paymentSummary?.menuDiscountPercentage) > 0 ? ` (${paymentSummary.menuDiscountPercentage}%)` : ""}
+                        </span>
+                        <span className="text-sm font-semibold text-[#334257]">{formatCurrency(paymentSummary.menuDiscount)}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-2 border-b border-[#e3e6ef]">
+                        <span className="text-sm text-[#8a94aa]">↳ Borne by Admin</span>
+                        <span className="text-sm font-semibold text-[#334257]">{formatCurrency(paymentSummary.menuDiscountAdminShare || 0)}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-2 border-b border-[#e3e6ef]">
+                        <span className="text-sm text-[#8a94aa]">↳ Borne by Restaurant</span>
+                        <span className="text-sm font-semibold text-[#334257]">{formatCurrency(paymentSummary.menuDiscountRestaurantShare || 0)}</span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex justify-between items-center py-2">
                     <span className="text-sm font-semibold text-[#334257]">Total Order Value</span>
                     <span className="text-sm font-bold text-[#006fbd]">{formatCurrency(paymentSummary?.total || 0)}</span>

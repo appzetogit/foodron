@@ -20,6 +20,7 @@ import alertSound from "@food/assets/audio/alert.mp3"
 import originalSound from "@food/assets/audio/original.mp3"
 import { getCancellationDisplayLabel } from "@food/utils/cancellationDisplay"
 import { getLifecycleDisplay } from "@food/utils/orderLifecycleDisplay"
+import { getOrderDiscountBreakdown } from "@food/utils/menuDiscount"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
@@ -458,6 +459,7 @@ export default function OrdersPage({ statusKey = "all" }) {
         }
       }
       const itemDiscount = Math.max(0, totalDiscount - couponDiscount - referralDiscount)
+      const menuDiscountBreakdown = getOrderDiscountBreakdown(pricing)
 
       const restaurantCommission = Number(
         pricing.restaurantCommission ||
@@ -599,6 +601,14 @@ export default function OrdersPage({ statusKey = "all" }) {
         totalItemAmount: subtotal,
         couponDiscount,
         itemDiscount,
+        menuDiscount: menuDiscountBreakdown.menu,
+        menuDiscountPercent: menuDiscountBreakdown.percentage,
+        menuDiscountSource: menuDiscountBreakdown.source,
+        menuDiscountPeriod: menuDiscountBreakdown.period,
+        menuAdminShare: menuDiscountBreakdown.adminShare,
+        menuRestaurantShare: menuDiscountBreakdown.restaurantShare,
+        menuAdminBearPercentage: menuDiscountBreakdown.adminBearPercentage,
+        menuRestaurantBearPercentage: menuDiscountBreakdown.restaurantBearPercentage,
         deliveryCharge: deliveryFee,
         vatTax: taxAmount,
         platformFee,

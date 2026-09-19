@@ -55,6 +55,7 @@ import { computePlatformNetProfitWithQuickFreeze } from '../utils/quickFinance.u
 import { FoodItem } from '../../admin/models/food.model.js';
 import { FoodAddon } from '../../restaurant/models/foodAddon.model.js';
 import { resolveDiscountSplitByCoupon } from '../../shared/discountSplit.util.js';
+import { resolveMenuDiscountForOrder } from '../../shared/menuDiscount.util.js';
 import { resolveRestaurantPhone } from '../../shared/restaurantContact.js';
 import { FoodTransaction } from '../models/foodTransaction.model.js';
 import { FoodSupportTicket } from '../../user/models/supportTicket.model.js';
@@ -2658,7 +2659,16 @@ export async function calculateOrder(userId, dto, options = {}) {
     ? new mongoose.Types.ObjectId(String(primaryRestaurant.sourceId))
     : null;
 
-  let discount = 0;
+  // Restaurant-wide menu discount (auto-applied, date-windowed). Applied first; coupon then
+  // works on the already-discounted item subtotal so total discount can never exceed subtotal.
+  const { menuDiscount, menuDiscountInfo } = foodItemSubtotal > 0
+    ? await resolveMenuDiscountForOrder({
+        restaurantObjectId: resolvedRestaurantObjectId,
+        itemSubtotal: foodItemSubtotal,
+      })
+    : { menuDiscount: 0, menuDiscountInfo: null };
+
+  let couponDiscount = 0;
   let appliedCoupon = null;
   const codeRaw = dto.couponCode
     ? String(dto.couponCode).trim().toUpperCase()
@@ -2667,12 +2677,15 @@ export async function calculateOrder(userId, dto, options = {}) {
     const couponResult = await validateAndApplyCoupon({
       couponCode: codeRaw,
       itemSubtotal: foodItemSubtotal,
+      discountBase: Math.max(0, foodItemSubtotal - menuDiscount),
       userId,
       resolvedRestaurantObjectId,
     });
-    discount = couponResult.discount;
+    couponDiscount = couponResult.discount;
     appliedCoupon = couponResult.appliedCoupon;
   }
+  // `discount` stays the TOTAL item-level discount so every total formula keeps working.
+  const discount = roundCurrency(menuDiscount + couponDiscount);
 
   const gstRate = feeSettings.gstRate;
   const discountedSubtotal = Math.max(0, subtotal - discount);
@@ -2799,6 +2812,9 @@ export async function calculateOrder(userId, dto, options = {}) {
       deliveryFeeBreakdown,
       platformFee,
       discount,
+      couponDiscount,
+      menuDiscount,
+      menuDiscountInfo,
       /** Food Quick surcharge only (0 for Basic). */
       quickDeliveryFee: foodQuickDeliveryFee,
       quickPlatformShare: foodQuickPlatformShare,
@@ -3004,11 +3020,17 @@ export async function createOrder(userId, dto) {
         : Math.max(0, Number(serverPricing.subtotal || 0));
 
   let restaurantDiscountShareForCommission = 0;
-  const orderDiscount = Math.max(0, Number(serverPricing.discount || 0));
-  if (orderDiscount > 0 && foodCommissionSubtotal > 0) {
+  const serverMenuDiscount = Math.max(0, Number(serverPricing.menuDiscount || 0));
+  const serverMenuAdminShare = Math.max(0, Number(serverPricing.menuDiscountInfo?.adminShare || 0));
+  const serverMenuRestaurantShare = Math.max(0, Number(serverPricing.menuDiscountInfo?.restaurantShare || 0));
+  const orderCouponDiscount = Math.max(
+    0,
+    Number(serverPricing.couponDiscount ?? Number(serverPricing.discount || 0) - serverMenuDiscount),
+  );
+  if (orderCouponDiscount > 0 && foodCommissionSubtotal > 0) {
     const split = await resolveDiscountSplitByCoupon({
       couponCode: serverPricing.couponCode || couponCodeFromClient || "",
-      discount: orderDiscount,
+      discount: orderCouponDiscount,
       couponSource: serverPricing.appliedCoupon?.source,
     });
     restaurantDiscountShareForCommission = Math.max(
@@ -3016,6 +3038,8 @@ export async function createOrder(userId, dto) {
       Number(split.restaurantDiscountShare || 0),
     );
   }
+  // Restaurant-borne part of the menu discount also reduces the commission base.
+  restaurantDiscountShareForCommission += serverMenuRestaurantShare;
 
   const commissionBase = Math.max(
     0,
@@ -3058,6 +3082,9 @@ export async function createOrder(userId, dto) {
     ),
     platformFee: Math.max(0, Number(serverPricing.platformFee || 0)),
     discount: Math.max(0, Number(serverPricing.discount || 0)),
+    couponDiscount: orderCouponDiscount,
+    menuDiscount: serverMenuDiscount,
+    menuDiscountInfo: serverPricing.menuDiscountInfo || undefined,
     restaurantCommissionPercentage: commissionPercentage,
     restaurantCommission,
     quickDeliveryFee: Math.max(0, Number(serverPricing.quickDeliveryFee || 0)),
@@ -3210,7 +3237,8 @@ export async function createOrder(userId, dto) {
     sellerCommission: 0,
     quickPlatformShare,
     baseRiderShare: baseRiderEarning,
-    adminDiscountShare: 0,
+    // Menu discount admin share is funded from admin earning (coupon flow unchanged).
+    adminDiscountShare: serverMenuAdminShare,
   });
   // GST collected from customer attributed to platform for remittance/reporting.
   platformProfit = Math.max(

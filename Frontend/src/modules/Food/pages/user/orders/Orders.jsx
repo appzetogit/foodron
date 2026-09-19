@@ -16,6 +16,7 @@ import {
   isRestaurantAcceptanceTimeout,
 } from "@food/utils/cancellationDisplay"
 import { getLifecycleDisplay } from "@food/utils/orderLifecycleDisplay"
+import { getOrderDiscountBreakdown } from "@food/utils/menuDiscount"
 const debugLog = (...args) => { }
 const debugWarn = (...args) => { }
 const debugError = (...args) => { }
@@ -973,10 +974,18 @@ Order again from this restaurant in the ${companyName} app.`
                         <span className="text-gray-800 dark:text-white font-medium">{"\u20B9"}{order.tax.toFixed(2)}</span>
                       </div>
                     )}
-                    {order.pricing?.discount > 0 && (
+                    {getOrderDiscountBreakdown(order.pricing).menu > 0 && (
                       <div className="flex justify-between text-xs">
-                        <span className="text-green-600">Discount</span>
-                        <span className="text-green-600 font-medium">-{"\u20B9"}{order.pricing.discount.toFixed(2)}</span>
+                        <span className="text-green-600">
+                          Menu discount{getOrderDiscountBreakdown(order.pricing).percentage > 0 ? ` (${getOrderDiscountBreakdown(order.pricing).percentage}% off)` : ""}
+                        </span>
+                        <span className="text-green-600 font-medium">-{"\u20B9"}{getOrderDiscountBreakdown(order.pricing).menu.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {getOrderDiscountBreakdown(order.pricing).coupon > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-green-600">Coupon discount</span>
+                        <span className="text-green-600 font-medium">-{"\u20B9"}{getOrderDiscountBreakdown(order.pricing).coupon.toFixed(2)}</span>
                       </div>
                     )}
                     {order.pricing?.couponCode && (

@@ -77,6 +77,10 @@ import {
     deleteRestaurantCouponController
 } from '../controllers/restaurantCoupon.controller.js';
 import {
+    restaurantMenuDiscountControllers,
+    getPublicRestaurantMenuDiscountController
+} from '../../admin/controllers/menuDiscount.controller.js';
+import {
     listRestaurantAdvertisementsController,
     getRestaurantAdvertisementController,
     createRestaurantAdvertisementController,
@@ -171,6 +175,7 @@ router.get('/restaurants/under-250', (req, res, next) => {
     return cacheResponse(300, 'restaurants_under_250')(req, res, next);
 }, listUnder250RestaurantsController);
 router.get('/restaurants/:id', cacheResponse(600, 'restaurant_detail'), getApprovedRestaurantController);
+router.get('/restaurants/:id/menu-discount', getPublicRestaurantMenuDiscountController);
 router.get('/restaurants/:id/menu', cacheResponse(600, 'restaurant_menu'), getPublicRestaurantMenuController);
 router.get('/restaurants/:id/outlet-timings', cacheResponse(600, 'restaurant_timings'), getOutletTimingsByRestaurantIdController);
 router.get('/offers', optionalAuthMiddleware, listPublicOffersController);
@@ -341,6 +346,13 @@ router.get('/coupons', authMiddleware, requireRestaurant, requireApprovedRestaur
 router.post('/coupons', authMiddleware, requireRestaurant, requireApprovedRestaurant, createRestaurantCouponController);
 router.put('/coupons/:id', authMiddleware, requireRestaurant, requireApprovedRestaurant, updateRestaurantCouponController);
 router.delete('/coupons/:id', authMiddleware, requireRestaurant, requireApprovedRestaurant, deleteRestaurantCouponController);
+
+// Menu discounts (restaurant dashboard) — restaurant bears 100%
+router.get('/menu-discounts', authMiddleware, requireRestaurant, requireApprovedRestaurant, restaurantMenuDiscountControllers.list);
+router.post('/menu-discounts', authMiddleware, requireRestaurant, requireApprovedRestaurant, restaurantMenuDiscountControllers.create);
+router.put('/menu-discounts/:id', authMiddleware, requireRestaurant, requireApprovedRestaurant, restaurantMenuDiscountControllers.update);
+router.patch('/menu-discounts/:id/status', authMiddleware, requireRestaurant, requireApprovedRestaurant, restaurantMenuDiscountControllers.toggle);
+router.delete('/menu-discounts/:id', authMiddleware, requireRestaurant, requireApprovedRestaurant, restaurantMenuDiscountControllers.remove);
 
 // Advertisements (restaurant dashboard)
 router.get('/advertisements', authMiddleware, requireRestaurant, requireApprovedRestaurant, listRestaurantAdvertisementsController);

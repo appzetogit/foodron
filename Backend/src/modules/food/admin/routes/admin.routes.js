@@ -14,6 +14,7 @@ import * as notificationBroadcastController from '../controllers/notificationBro
 import * as notificationChannelController from '../controllers/notificationChannel.controller.js';
 import * as orderController from '../../orders/controllers/order.controller.js';
 import { getAdminPageController, upsertAdminPageController } from '../controllers/pageContent.controller.js';
+import { adminMenuDiscountControllers } from '../controllers/menuDiscount.controller.js';
 import * as employeeController from '../controllers/employee.controller.js';
 import { upload } from '../../../../middleware/upload.js';
 import { checkPermission } from '../../../../core/auth/auth.middleware.js';
@@ -133,6 +134,13 @@ router.delete('/foods/:id', checkPermission('food::food_management::foods::list'
 // Food approval queue (pending items created by restaurants)
 router.patch('/foods/:id/approve', checkPermission('food::food_management::food_approval', 'edit'), foodApprovalController.approveFoodItemController);
 router.patch('/foods/:id/reject', checkPermission('food::food_management::food_approval', 'edit'), foodApprovalController.rejectFoodItemController);
+
+// ----- Restaurant Menu Discounts -----
+router.get('/menu-discounts', checkPermission('food::restaurant_management::restaurants::menu_discount', 'view'), adminMenuDiscountControllers.list);
+router.post('/menu-discounts', checkPermission('food::restaurant_management::restaurants::menu_discount', 'create'), adminMenuDiscountControllers.create);
+router.put('/menu-discounts/:id', checkPermission('food::restaurant_management::restaurants::menu_discount', 'edit'), adminMenuDiscountControllers.update);
+router.patch('/menu-discounts/:id/status', checkPermission('food::restaurant_management::restaurants::menu_discount', 'edit'), adminMenuDiscountControllers.toggle);
+router.delete('/menu-discounts/:id', checkPermission('food::restaurant_management::restaurants::menu_discount', 'delete'), adminMenuDiscountControllers.remove);
 
 // ----- Offers & Coupons -----
 router.get('/offers', checkPermission('food::promotions_management::coupons', 'view'), adminController.getAllOffers);

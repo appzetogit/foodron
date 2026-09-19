@@ -254,9 +254,8 @@ const buildCustomerReceiptPdfDocument = async (order, settings = {}) => {
     order.deliveryCharge ?? order.deliveryFee ?? order.pricing?.deliveryFee ?? order.delivery?.fee,
   )
   const taxAmount = toNumber(order.vatTax ?? order.taxAmount ?? order.tax ?? order.gst ?? order.pricing?.tax)
-  const discountAmount = toNumber(
-    order.couponDiscount ?? order.itemDiscount ?? order.discountAmount ?? order.pricing?.discount,
-  )
+  const invoiceDiscount = resolveInvoiceDiscount(order)
+  const discountAmount = invoiceDiscount.total
   const platformFee = toNumber(order.platformFee ?? order.pricing?.platformFee)
   const packagingFee = toNumber(order.packagingFee ?? order.pricing?.packagingFee)
   const computedTotal = subtotal + deliveryFee + platformFee + packagingFee + taxAmount - discountAmount
@@ -299,7 +298,13 @@ const buildCustomerReceiptPdfDocument = async (order, settings = {}) => {
   if (packagingFee > 0) summaryRows.push(["Packaging", formatRupee(packagingFee)])
   if (platformFee > 0) summaryRows.push(["Platform fee", formatRupee(platformFee)])
   if (taxAmount > 0) summaryRows.push(["Taxes (GST)", formatRupee(taxAmount)])
-  if (discountAmount > 0) summaryRows.push(["Discount", `- ${formatRupee(discountAmount)}`])
+  if (invoiceDiscount.menu > 0) {
+    summaryRows.push([
+      invoiceDiscount.percent > 0 ? `Menu discount (${invoiceDiscount.percent}% off)` : "Menu discount",
+      `- ${formatRupee(invoiceDiscount.menu)}`,
+    ])
+    if (invoiceDiscount.coupon > 0) summaryRows.push(["Coupon discount", `- ${formatRupee(invoiceDiscount.coupon)}`])
+  } else if (discountAmount > 0) summaryRows.push(["Discount", `- ${formatRupee(discountAmount)}`])
   if (hasReturn) {
     summaryRows.push(["Original paid", formatRupee(originalPaidTotal || customerTotal)])
     if (returnRefundedAmount > 0) summaryRows.push(["Refunded", `- ${formatRupee(returnRefundedAmount)}`])
@@ -444,6 +449,24 @@ const generateCustomerReceiptInvoice = async (order, settings = {}, saveOptions 
 }
 
 /** Build customer invoice PDF for download or native file share. */
+/** Splits invoice discount into menu discount + coupon/other discount (menu part only when present). */
+function resolveInvoiceDiscount(order) {
+  const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
+  const menu = num(order.menuDiscount ?? order.pricing?.menuDiscount)
+  const legacy = num(order.couponDiscount ?? order.itemDiscount ?? order.discountAmount ?? order.pricing?.discount)
+  if (menu <= 0) return { total: legacy, menu: 0, coupon: legacy, percent: 0 }
+  const coupon = Math.max(
+    0,
+    num(order.couponDiscount ?? order.pricing?.couponDiscount ?? (num(order.pricing?.discount) - menu)),
+  )
+  return {
+    total: menu + coupon,
+    menu,
+    coupon,
+    percent: num(order.menuDiscountPercent ?? order.pricing?.menuDiscountInfo?.percentage),
+  }
+}
+
 export const buildOrderInvoicePdf = async (order, options = {}) => {
   const audience = options.audience === "customer" ? "customer" : "restaurant"
   if (audience !== "customer") {
@@ -526,12 +549,8 @@ export const generateOrderInvoice = async (order, options = {}) => {
       order.gst ??
       order.pricing?.tax
     )
-    const discountAmount = toNumber(
-      order.couponDiscount ??
-      order.itemDiscount ??
-      order.discountAmount ??
-      order.pricing?.discount
-    )
+    const invoiceDiscount = resolveInvoiceDiscount(order)
+    const discountAmount = invoiceDiscount.total
     const platformFee = toNumber(
       order.platformFee ??
       order.pricing?.platformFee
@@ -881,7 +900,13 @@ export const generateOrderInvoice = async (order, options = {}) => {
       if (includeFoodQuickDeliveryFee) summaryRows.push(["Quick Delivery", formatMoney(quickDeliveryFee)])
       if (platformFee > 0) summaryRows.push(["Platform Fee", formatMoney(platformFee)])
       summaryRows.push(["GST / Taxes", formatMoney(taxAmount)])
-      if (discountAmount > 0) summaryRows.push(["Discount", `- ${formatMoney(discountAmount)}`])
+      if (invoiceDiscount.menu > 0) {
+        summaryRows.push([
+          invoiceDiscount.percent > 0 ? `Menu Discount (${invoiceDiscount.percent}% off)` : "Menu Discount",
+          `- ${formatMoney(invoiceDiscount.menu)}`,
+        ])
+        if (invoiceDiscount.coupon > 0) summaryRows.push(["Coupon Discount", `- ${formatMoney(invoiceDiscount.coupon)}`])
+      } else if (discountAmount > 0) summaryRows.push(["Discount", `- ${formatMoney(discountAmount)}`])
       summaryRows.push(["Amount Paid", formatMoney(customerTotal)])
       if (isQuickOrder && (hasRefund || returnSummary?.hasReturn)) {
         summaryRows.push(["Original Paid", formatMoney(originalPaidTotal || customerTotal)])

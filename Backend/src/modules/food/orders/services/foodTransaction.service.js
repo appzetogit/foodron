@@ -69,6 +69,12 @@ export async function createInitialTransaction(order) {
     restaurantNet = Math.max(0, restaurantNet - restaurantCommission);
 
     const discount = Number(order.pricing?.discount || 0) || 0;
+    // discount = coupon part + menu-discount part; each is split by its own rule.
+    const menuDiscount = Math.min(discount, Math.max(0, Number(order.pricing?.menuDiscount || 0) || 0));
+    const menuInfo = order.pricing?.menuDiscountInfo || {};
+    const menuAdminShare = menuDiscount > 0 ? Math.min(menuDiscount, Math.max(0, Number(menuInfo.adminShare || 0) || 0)) : 0;
+    const menuRestaurantShare = menuDiscount > 0 ? Math.max(0, Math.round((menuDiscount - menuAdminShare) * 100) / 100) : 0;
+    const couponDiscount = Math.max(0, Math.round((discount - menuDiscount) * 100) / 100);
     const couponCode = order.pricing?.couponCode;
     const couponSource = order.pricing?.appliedCoupon?.source;
     let adminDiscountShare = 0;
@@ -76,16 +82,21 @@ export async function createInitialTransaction(order) {
     let discountAdminBearPercentage = 0;
     let discountRestaurantBearPercentage = 0;
 
-    if (discount > 0) {
+    if (couponDiscount > 0) {
         const split = await resolveDiscountSplitByCoupon({
             couponCode,
-            discount,
+            discount: couponDiscount,
             couponSource,
         });
         adminDiscountShare = split.adminDiscountShare;
         restaurantDiscountShare = split.restaurantDiscountShare;
-        discountAdminBearPercentage = split.adminBearPercentage;
-        discountRestaurantBearPercentage = split.restaurantBearPercentage;
+    }
+    adminDiscountShare = Math.round((adminDiscountShare + menuAdminShare) * 100) / 100;
+    restaurantDiscountShare = Math.round((restaurantDiscountShare + menuRestaurantShare) * 100) / 100;
+    if (discount > 0) {
+        // Effective overall bear split across coupon + menu discount.
+        discountAdminBearPercentage = Math.round((adminDiscountShare / discount) * 10000) / 100;
+        discountRestaurantBearPercentage = Math.round((restaurantDiscountShare / discount) * 10000) / 100;
     }
 
     restaurantNet = Math.max(0, restaurantNet - restaurantDiscountShare);
@@ -178,8 +189,10 @@ export async function createInitialTransaction(order) {
             deliverySponsorType: String(order.pricing?.deliverySponsorType || 'USER_FULL'),
             platformFee: Number(order.pricing?.platformFee || 0) || 0,
             discount: Number(order.pricing?.discount || 0) || 0,
+            menuDiscount,
+            menuDiscountInfo: order.pricing?.menuDiscountInfo || undefined,
             couponCode: order.pricing?.couponCode || order.couponCode || null,
-            couponDiscount: Number(order.pricing?.couponDiscount || order.couponDiscount || 0) || 0,
+            couponDiscount: Number(order.pricing?.couponDiscount || order.couponDiscount || couponDiscount || 0) || 0,
             appliedCoupon: order.pricing?.appliedCoupon || order.appliedCoupon || null,
             referralDiscount: Number(order.pricing?.referralDiscount || order.referralDiscount || 0) || 0,
             restaurantCommissionPercentage: Number(order.pricing?.restaurantCommissionPercentage || 0) || 0,
@@ -208,6 +221,10 @@ export async function createInitialTransaction(order) {
             restaurantDiscountShare,
             discountAdminBearPercentage,
             discountRestaurantBearPercentage,
+            menuDiscount,
+            menuAdminDiscountShare: menuAdminShare,
+            menuRestaurantDiscountShare: menuRestaurantShare,
+            couponDiscount,
             quickDeliveryFee,
             quickPlatformShare,
             quickRiderBonus,
@@ -482,6 +499,10 @@ export async function applyRefundToTransaction(
         Math.round((Number(amounts.adminDiscountShare) || 0) * remainRatio * 100) / 100;
     amounts.restaurantDiscountShare =
         Math.round((Number(amounts.restaurantDiscountShare) || 0) * remainRatio * 100) / 100;
+    amounts.menuAdminDiscountShare =
+        Math.round((Number(amounts.menuAdminDiscountShare) || 0) * remainRatio * 100) / 100;
+    amounts.menuRestaurantDiscountShare =
+        Math.round((Number(amounts.menuRestaurantDiscountShare) || 0) * remainRatio * 100) / 100;
     transaction.amounts = amounts;
 
     // Keep settled amount consistent if share was scaled (override path only)

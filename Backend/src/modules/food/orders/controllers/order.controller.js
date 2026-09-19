@@ -15,6 +15,7 @@ import {
 import {
     toOrderMutationAck,
     toOrderCreateDto,
+    shapeMenuDiscountInfo,
     toOrderListItemDto,
     toOrderDetailDto,
     toDeliveryTripDto,
@@ -103,6 +104,7 @@ export async function calculateOrderController(req, res, next) {
             quickRestaurantShare,
             quickSharePcts,
             quickFinanceVersion,
+            menuDiscountInfo,
             pickupPoints,
             mixedOrderDistanceLimit,
             mixedOrderAngleLimit,
@@ -116,7 +118,11 @@ export async function calculateOrderController(req, res, next) {
 
         return sendResponse(res, 200, 'Pricing calculated', {
             ...publicResult,
-            pricing: publicPricing,
+            pricing: {
+                ...publicPricing,
+                // Customer-facing discount info only (no admin/restaurant bear split).
+                menuDiscountInfo: shapeMenuDiscountInfo(menuDiscountInfo, 'USER') || null,
+            },
             serviceZone: publicZone,
         });
         // feeSettingsDoc + full zone polygon stay internal (createOrder reuse only).

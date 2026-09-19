@@ -75,7 +75,32 @@ function slimPayment(payment) {
   };
 }
 
-function slimPricing(pricing) {
+/**
+ * Menu discount snapshot for a given audience. The admin/restaurant bear split is internal
+ * finance: only ADMIN / RESTAURANT audiences receive it; customers & riders get the public part.
+ */
+export function shapeMenuDiscountInfo(info, role = "USER") {
+  if (!info || typeof info !== "object" || !(Number(info.percentage) > 0)) return undefined;
+  const audience = String(role || "").toUpperCase();
+  const base = {
+    percentage: info.percentage,
+    source: info.source,
+    scheduleType: info.scheduleType,
+    startDate: info.startDate,
+    endDate: info.endDate,
+    discountAmount: info.discountAmount,
+  };
+  if (audience !== "ADMIN" && audience !== "RESTAURANT") return base;
+  return {
+    ...base,
+    adminBearPercentage: info.adminBearPercentage,
+    restaurantBearPercentage: info.restaurantBearPercentage,
+    adminShare: info.adminShare,
+    restaurantShare: info.restaurantShare,
+  };
+}
+
+function slimPricing(pricing, role = "USER") {
   if (!pricing || typeof pricing !== "object") return undefined;
   return {
     subtotal: pricing.subtotal,
@@ -86,6 +111,8 @@ function slimPricing(pricing) {
     tax: pricing.tax,
     discount: pricing.discount,
     couponDiscount: pricing.couponDiscount,
+    menuDiscount: pricing.menuDiscount,
+    menuDiscountInfo: shapeMenuDiscountInfo(pricing.menuDiscountInfo, role),
     restaurantCommission: pricing.restaurantCommission,
     total: pricing.total,
     deliveryDistanceKm: pricing.deliveryDistanceKm,
@@ -201,7 +228,7 @@ export function toOrderCreateDto(orderLike) {
     restaurantImage:
       o.restaurantImage || restaurantProfileImageUrl(restaurantRef) || undefined,
     items: slimItems(o.items),
-    pricing: slimPricing(o.pricing),
+    pricing: slimPricing(o.pricing, role),
     payment: slimPayment(o.payment),
     deliveryAddress: o.deliveryAddress || o.address,
     deliveryMode: o.deliveryMode,
@@ -552,6 +579,9 @@ export const RESTAURANT_ORDER_LIST_SELECT = [
   "pricing.tax",
   "pricing.packagingFee",
   "pricing.discount",
+  "pricing.couponDiscount",
+  "pricing.menuDiscount",
+  "pricing.menuDiscountInfo",
   "pricing.deliveryFee",
   "pricing.platformFee",
   "pricing.quickDeliveryFee",
@@ -622,6 +652,9 @@ function slimRestaurantListPricing(pricing) {
     taxes: pricing.taxes ?? tax,
     packagingFee: pricing.packagingFee,
     discount: pricing.discount,
+    couponDiscount: pricing.couponDiscount,
+    menuDiscount: pricing.menuDiscount,
+    menuDiscountInfo: shapeMenuDiscountInfo(pricing.menuDiscountInfo, "RESTAURANT"),
     deliveryFee: pricing.deliveryFee,
     platformFee: pricing.platformFee,
   });
@@ -838,6 +871,9 @@ export const USER_ORDER_LIST_SELECT = [
   "pricing.platformFee",
   "pricing.packagingFee",
   "pricing.discount",
+  "pricing.couponDiscount",
+  "pricing.menuDiscount",
+  "pricing.menuDiscountInfo",
   "pricing.couponCode",
   "pricing.appliedCoupon",
   "payment.method",
@@ -924,6 +960,9 @@ function slimUserListPricing(pricing) {
     platformFee: pricing.platformFee,
     packagingFee: pricing.packagingFee,
     discount: pricing.discount,
+    couponDiscount: pricing.couponDiscount,
+    menuDiscount: pricing.menuDiscount,
+    menuDiscountInfo: shapeMenuDiscountInfo(pricing.menuDiscountInfo, "USER"),
     couponCode,
   };
 }

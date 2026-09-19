@@ -249,7 +249,10 @@ export async function validateAndApplyCoupon({
     itemSubtotal,
     userId,
     resolvedRestaurantObjectId,
+    /** Amount the coupon % / flat is computed on (item subtotal after menu discount). Defaults to itemSubtotal. */
+    discountBase = null,
 }) {
+    const discountableAmount = discountBase == null ? itemSubtotal : Math.max(0, Number(discountBase) || 0);
     const codeRaw = couponCode ? String(couponCode).trim().toUpperCase() : '';
     if (!codeRaw || itemSubtotal <= 0) {
         return { discount: 0, appliedCoupon: null };
@@ -279,7 +282,7 @@ export async function validateAndApplyCoupon({
 
         const allowed = statusOk && scopeOk && minOk && dateOk && usageOk && perUserOk && firstOrderOk;
         if (allowed) {
-            const discount = calculateDiscountFromCoupon(offer, itemSubtotal);
+            const discount = calculateDiscountFromCoupon(offer, discountableAmount);
             return {
                 discount,
                 appliedCoupon: {
@@ -324,7 +327,7 @@ export async function validateAndApplyCoupon({
         return { discount: 0, appliedCoupon: null };
     }
 
-    const discount = calculateDiscountFromCoupon(restCoupon, itemSubtotal);
+    const discount = calculateDiscountFromCoupon(restCoupon, discountableAmount);
     return {
         discount,
         appliedCoupon: {
