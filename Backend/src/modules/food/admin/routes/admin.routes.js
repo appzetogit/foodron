@@ -18,6 +18,7 @@ import { adminMenuDiscountControllers } from '../controllers/menuDiscount.contro
 import * as employeeController from '../controllers/employee.controller.js';
 import { upload } from '../../../../middleware/upload.js';
 import { checkPermission } from '../../../../core/auth/auth.middleware.js';
+import * as bulkMenuController from '../../bulkMenu/bulkMenu.controller.js';
 
 const router = express.Router();
 
@@ -135,6 +136,18 @@ router.delete('/foods/:id', checkPermission('food::food_management::foods::list'
 // Food approval queue (pending items created by restaurants)
 router.patch('/foods/:id/approve', checkPermission('food::food_management::food_approval', 'edit'), foodApprovalController.approveFoodItemController);
 router.patch('/foods/:id/reject', checkPermission('food::food_management::food_approval', 'edit'), foodApprovalController.rejectFoodItemController);
+
+// ----- Bulk menu import (ZIP: menu.xlsx + images/) -----
+// entity (food | addon | both) travels in the query string so RBAC runs BEFORE the ZIP is accepted.
+router.get('/bulk-menu/template', bulkMenuController.bulkMenuPermission('query', 'create'), bulkMenuController.downloadBulkTemplate);
+router.post(
+    '/restaurants/:restaurantId/bulk-menu/validate',
+    bulkMenuController.bulkMenuPermission('query', 'create'),
+    bulkMenuController.bulkMenuZipUpload,
+    bulkMenuController.validateBulkMenu
+);
+router.post('/bulk-menu/imports/:jobId/start', bulkMenuController.bulkMenuPermission('job', 'create'), bulkMenuController.startBulkMenuImport);
+router.get('/bulk-menu/imports/:jobId', bulkMenuController.bulkMenuPermission('job', 'view'), bulkMenuController.getBulkMenuImportStatus);
 
 // ----- Restaurant Menu Discounts -----
 router.get('/menu-discounts', checkPermission('food::restaurant_management::restaurants::menu_discount', 'view'), adminMenuDiscountControllers.list);

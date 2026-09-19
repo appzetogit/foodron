@@ -69,6 +69,7 @@ import { sendError } from '../../../../utils/response.js';
 import { getRestaurantFinanceController, getRestaurantSubscriptionWalletController } from '../controllers/restaurantFinance.controller.js';
 import { createTopupOrderController, verifyTopupController } from '../../subscriptions/controllers/subscription.controller.js';
 import { FoodRestaurant } from '../models/restaurant.model.js';
+import * as bulkMenuController from '../../bulkMenu/bulkMenu.controller.js';
 
 import {
     listRestaurantCouponsController,
@@ -323,6 +324,19 @@ router.get('/addons', authMiddleware, requireRestaurant, requireApprovedRestaura
 router.post('/addons', authMiddleware, requireRestaurant, requireApprovedRestaurant, createAddonController);
 router.patch('/addons/:id', authMiddleware, requireRestaurant, requireApprovedRestaurant, updateAddonController);
 router.delete('/addons/:id', authMiddleware, requireRestaurant, requireApprovedRestaurant, deleteAddonController);
+
+// Bulk menu import (ZIP: menu.xlsx + images/). Restaurant id always comes from the auth token.
+router.get('/bulk-menu/template', authMiddleware, requireRestaurant, requireApprovedRestaurant, bulkMenuController.downloadBulkTemplate);
+router.post(
+    '/bulk-menu/validate',
+    authMiddleware,
+    requireRestaurant,
+    requireApprovedRestaurant,
+    bulkMenuController.bulkMenuZipUpload,
+    bulkMenuController.validateBulkMenu
+);
+router.post('/bulk-menu/imports/:jobId/start', authMiddleware, requireRestaurant, requireApprovedRestaurant, bulkMenuController.startBulkMenuImport);
+router.get('/bulk-menu/imports/:jobId', authMiddleware, requireRestaurant, requireApprovedRestaurant, bulkMenuController.getBulkMenuImportStatus);
 
 // Orders (restaurant dashboard)
 router.get('/orders', authMiddleware, requireRestaurant, requireApprovedRestaurant, orderController.listOrdersRestaurantController);

@@ -13,6 +13,7 @@
     "worker:tracking": "node src/queues/workers/tracking.worker.js",
     "worker:payment": "node src/queues/workers/payment.worker.js",
     "worker:subscription": "node src/queues/workers/subscription.worker.js",
+    "worker:bulk-menu": "node src/queues/workers/bulkMenuImport.worker.js",
     "migrate:cloudinary-webp": "node scripts/migrate-cloudinary-image-urls-to-webp.js",
     "migrate:fcm-tokens": "node scripts/migrate-fcm-tokens-to-profile-models.js",
     "migrate:order-payments": "node scripts/migrate-orders-to-transactions.js",
@@ -25,7 +26,9 @@
     "cleanup:legacy-collections": "node scripts/cleanup-legacy-collections.js",
     "create-admin": "node scripts/create-admin.js",
     "install:sharp": "node scripts/install-sharp.js",
-    "test": "echo \"No tests configured\" && exit 0"
+    "test": "echo \"No tests configured\" && exit 0",
+    "test:bulk-menu": "node --test tests/bulkMenu.test.mjs",
+    "test:bulk-menu:redis": "node --test tests/bulkMenu.redis.test.mjs"
   },
   "keywords": [],
   "author": "",
@@ -46,6 +49,7 @@
     "ioredis": "^5.4.1",
     "joi": "^18.1.2",
     "jsonwebtoken": "^9.0.2",
+    "jszip": "^3.10.1",
     "mongo-sanitize": "^1.1.0",
     "mongoose": "^8.4.1",
     "morgan": "^1.10.0",
@@ -59,6 +63,7 @@
     "sharp": "^0.33.5",
     "simplify-js": "^1.2.4",
     "socket.io": "^4.7.5",
+    "unzipper": "^0.10.14",
     "xss-clean": "^0.1.4",
     "zod": "^3.23.8"
   },

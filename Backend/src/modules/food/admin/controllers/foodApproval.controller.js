@@ -15,6 +15,7 @@ export async function getPendingFoodApprovals(req, res, next) {
     }
 }
 import { invalidateCache } from '../../../../middleware/cache.js';
+import { invalidateCategoryCaches } from '../../shared/categoryCache.js';
 
 export async function approveFoodItemController(req, res, next) {
     try {
@@ -28,6 +29,8 @@ export async function approveFoodItemController(req, res, next) {
             invalidateCache(`restaurant_detail*`),
             // A category reaches the storefront only once it holds an approved item.
             invalidateCache('categories:*'),
+            // Public menu responses (restaurant_menu:*, restaurant_menus_batch:*) also embed approval state.
+            invalidateCategoryCaches(),
         ]).catch(console.error);
 
         return sendResponse(res, 200, 'Food item approved successfully', { food: updated });
@@ -42,7 +45,7 @@ export async function rejectFoodItemController(req, res, next) {
         const updated = await rejectFoodItem(req.params.id, req.body?.reason, performer);
         if (!updated) return sendError(res, 404, 'Food item not found or not pending');
 
-        await invalidateCache('categories:*').catch(console.error);
+        await invalidateCategoryCaches().catch(console.error);
 
         return sendResponse(res, 200, 'Food item rejected successfully', { food: updated });
     } catch (error) {

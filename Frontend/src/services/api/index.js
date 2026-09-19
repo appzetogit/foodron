@@ -1146,6 +1146,36 @@ export const adminAPI = {
       contextModule: "admin",
     }),
 
+  /**
+   * Bulk menu import (admin): one ZIP (menu.xlsx + images/) -> validate -> start -> poll status.
+   * entity: "food" | "addon" | "both". The selected restaurant is authoritative.
+   */
+  downloadBulkMenuTemplate: (entity, opts = {}) =>
+    apiClient.get("/food/admin/bulk-menu/template", {
+      params: { entity, ...opts },
+      responseType: "blob",
+      contextModule: "admin",
+    }),
+  validateBulkMenuImport: (restaurantId, entity, file) => {
+    if (!file) return Promise.reject(new Error("ZIP file is required"));
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiClient.post(
+      `/food/admin/restaurants/${String(restaurantId)}/bulk-menu/validate`,
+      formData,
+      { params: { entity }, timeout: 300000, contextModule: "admin" },
+    );
+  },
+  startBulkMenuImport: (jobId, body = {}) =>
+    apiClient.post(`/food/admin/bulk-menu/imports/${String(jobId)}/start`, body, {
+      contextModule: "admin",
+    }),
+  getBulkMenuImport: (jobId, params = {}) =>
+    apiClient.get(`/food/admin/bulk-menu/imports/${String(jobId)}`, {
+      params,
+      contextModule: "admin",
+    }),
+
   /** Restaurant add-ons approval (admin) */
   createRestaurantAddon: (body) =>
     apiClient.post("/food/admin/addons", body ?? {}, { contextModule: "admin" }),
@@ -1576,6 +1606,35 @@ export const restaurantAPI = {
     }),
   updateFood: (id, body) =>
     apiClient.patch(`/food/restaurant/foods/${String(id)}`, body ?? {}, {
+      contextModule: "restaurant",
+    }),
+  /**
+   * Bulk menu import (restaurant): one ZIP (menu.xlsx + images/) -> validate -> start -> poll status.
+   * The restaurant is taken from the auth token server-side. entity: "food" | "addon" | "both".
+   */
+  downloadBulkMenuTemplate: (entity, opts = {}) =>
+    apiClient.get("/food/restaurant/bulk-menu/template", {
+      params: { entity, ...opts },
+      responseType: "blob",
+      contextModule: "restaurant",
+    }),
+  validateBulkMenuImport: (entity, file) => {
+    if (!file) return Promise.reject(new Error("ZIP file is required"));
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiClient.post("/food/restaurant/bulk-menu/validate", formData, {
+      params: { entity },
+      timeout: 300000,
+      contextModule: "restaurant",
+    });
+  },
+  startBulkMenuImport: (jobId, body = {}) =>
+    apiClient.post(`/food/restaurant/bulk-menu/imports/${String(jobId)}/start`, body, {
+      contextModule: "restaurant",
+    }),
+  getBulkMenuImport: (jobId, params = {}) =>
+    apiClient.get(`/food/restaurant/bulk-menu/imports/${String(jobId)}`, {
+      params,
       contextModule: "restaurant",
     }),
   /** Orders (restaurant dashboard) — single-flight + short TTL; one cache per query key. */

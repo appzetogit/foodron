@@ -39,6 +39,7 @@ const RestaurantsBulkExport = lazy(() => import("@food/pages/admin/restaurant/Re
 const FoodsList = lazy(() => import("@food/pages/admin/foods/FoodsList"));
 const AdminItemDetailsPage = lazy(() => import("@food/pages/admin/foods/AdminItemDetailsPage"));
 const AddonsList = lazy(() => import("@food/pages/admin/addons/AddonsList"));
+const BulkMenuImport = lazy(() => import("@food/pages/admin/foods/BulkMenuImport"));
 // Promotions Management
 const BasicCampaign = lazy(() => import("@food/pages/admin/campaigns/BasicCampaign"));
 const FoodCampaign = lazy(() => import("@food/pages/admin/campaigns/FoodCampaign"));
@@ -265,6 +266,7 @@ export default function AdminRouter() {
             <Route path="referral-settings" element={<ReferralSettings />} />
             <Route path="foods" element={<FoodsList />} />
             <Route path="foods/new" element={<AdminItemDetailsPage />} />
+            <Route path="foods/bulk-upload" element={<BulkMenuImport />} />
             <Route path="foods/edit/:id" element={<AdminItemDetailsPage />} />
             <Route path="food/list" element={<FoodsList />} />
             <Route path="addons" element={<AddonsList />} />

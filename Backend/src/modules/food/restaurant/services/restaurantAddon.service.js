@@ -81,7 +81,24 @@ export async function listRestaurantAddons(restaurantId, query = {}) {
     };
 }
 
-export async function createRestaurantAddon(restaurantId, body) {
+/**
+ * Case-insensitive exact-name duplicate lookup among a restaurant's non-deleted add-ons.
+ * Shared by single create and the bulk importer's validation pass.
+ */
+export async function findDuplicateAddonByName(restaurantId, name) {
+    const rid = new mongoose.Types.ObjectId(String(restaurantId));
+    const exact = `^${escapeRegex(String(name || '').trim())}$`;
+    const exists = await FoodAddon.findOne({
+        restaurantId: rid,
+        isDeleted: { $ne: true },
+        'draft.name': { $regex: exact, $options: 'i' }
+    })
+        .select('_id')
+        .lean();
+    return exists?._id || null;
+}
+
+export async function createRestaurantAddon(restaurantId, body, options = {}) {
     if (!restaurantId || !mongoose.Types.ObjectId.isValid(String(restaurantId))) {
         throw new ValidationError('Invalid restaurant id');
     }
@@ -90,15 +107,7 @@ export async function createRestaurantAddon(restaurantId, body) {
     if (!name) throw new ValidationError('Add-on name is required');
 
     // Prevent duplicates per restaurant among non-deleted docs (case-insensitive exact).
-    const exact = `^${escapeRegex(name)}$`;
-    const exists = await FoodAddon.findOne({
-        restaurantId: rid,
-        isDeleted: { $ne: true },
-        'draft.name': { $regex: exact, $options: 'i' }
-    })
-        .select('_id')
-        .lean();
-    if (exists?._id) {
+    if (await findDuplicateAddonByName(rid, name)) {
         throw new ValidationError('Add-on already exists');
     }
 
@@ -121,6 +130,10 @@ export async function createRestaurantAddon(restaurantId, body) {
         isAvailable: true,
         isDeleted: false
     });
+
+    if (options.notifyAdmins === false) {
+        return normalizeAddonDoc(doc.toObject());
+    }
 
     try {
         const { notifyAdminsSafely } = await import('../../../../core/notifications/firebase.service.js');

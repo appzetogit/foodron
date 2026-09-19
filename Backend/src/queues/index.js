@@ -9,6 +9,7 @@ import {
     PAYMENT_QUEUE,
     TRACKING_QUEUE,
     SUBSCRIPTION_QUEUE,
+    BULK_MENU_IMPORT_QUEUE,
     QUEUE_NAMES
 } from './queue.constants.js';
 
@@ -116,6 +117,7 @@ export const getOrderQueue = () => getQueue(ORDER_QUEUE);
 export const getPaymentQueue = () => getQueue(PAYMENT_QUEUE);
 export const getTrackingQueue = () => getQueue(TRACKING_QUEUE);
 export const getSubscriptionQueue = () => getQueue(SUBSCRIPTION_QUEUE);
+export const getBulkMenuImportQueue = () => getQueue(BULK_MENU_IMPORT_QUEUE);
 
 /**
  * ✅ NEW: Schedules the hourly subscription expiry check.

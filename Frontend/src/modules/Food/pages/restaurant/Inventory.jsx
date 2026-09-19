@@ -2167,6 +2167,13 @@ export default function Inventory() {
             ) : null}
           </button>
           <button
+            onClick={() => navigate("/food/restaurant/bulk-upload")}
+            className="h-11 px-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 shrink-0"
+          >
+            <Upload className="w-4 h-4" />
+            Bulk upload
+          </button>
+          <button
             onClick={() => {
               if (activeTab === "add-ons") setIsAddAddonOpen(true)
               else navigate("/food/restaurant/hub-menu/item/new")

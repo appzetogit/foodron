@@ -4722,7 +4722,7 @@ export async function getRestaurantAddonsAdmin(query = {}) {
  * Admin creates an add-on directly for a restaurant (mirrors admin createFood):
  * no approval round-trip — it is published immediately.
  */
-export async function createRestaurantAddonAdmin(body = {}, performer = null) {
+export async function prepareRestaurantAddonAdmin(body = {}) {
     const restaurantId = body.restaurantId;
     if (!restaurantId || !mongoose.Types.ObjectId.isValid(String(restaurantId))) {
         throw new ValidationError('Valid restaurantId is required');
@@ -4768,6 +4768,13 @@ export async function createRestaurantAddonAdmin(body = {}, performer = null) {
         foodType
     };
 
+    return { rid, restaurant, payload };
+}
+
+export async function createRestaurantAddonAdmin(body = {}, performer = null, options = {}) {
+    const { rid, payload } = await prepareRestaurantAddonAdmin(body);
+    const name = payload.name;
+
     const now = new Date();
     const doc = await FoodAddon.create({
         restaurantId: rid,
@@ -4782,6 +4789,8 @@ export async function createRestaurantAddonAdmin(body = {}, performer = null) {
         isAvailable: body.isAvailable !== false,
         isDeleted: false
     });
+
+    if (options.notifyOwner === false) return doc.toObject();
 
     try {
         const { notifyOwnersWithInbox } = await import('../../../../core/notifications/ownerInboxNotify.js');
@@ -5192,6 +5201,22 @@ export async function listFoodNamesForCategory(query = {}) {
     return { names };
 }
 
+/**
+ * Adds `delta` approved foods to a restaurant's productCount and lists the restaurant the
+ * first time it gains a product. Same rule the single admin createFood always applied;
+ * the bulk importer calls it once per import with the number of foods created.
+ */
+export async function bumpApprovedFoodCount(restaurantId, delta = 1) {
+    if (!delta) return;
+    const { FoodRestaurant } = await import('../../restaurant/models/restaurant.model.js');
+    const restaurant = await FoodRestaurant.findByIdAndUpdate(restaurantId, {
+        $inc: { productCount: delta }
+    });
+    if (restaurant && (restaurant.productCount || 0) === 0) {
+        await FoodRestaurant.findByIdAndUpdate(restaurantId, { isListed: true });
+    }
+}
+
 export async function createFood(body) {
     const restaurantId = body.restaurantId;
     if (!restaurantId || !mongoose.Types.ObjectId.isValid(restaurantId)) {
@@ -5246,13 +5271,7 @@ export async function createFood(body) {
     });
     await doc.save();
     try {
-        const { FoodRestaurant } = await import('../../restaurant/models/restaurant.model.js');
-        const restaurant = await FoodRestaurant.findByIdAndUpdate(restaurantId, {
-            $inc: { productCount: 1 }
-        });
-        if (restaurant && (restaurant.productCount || 0) === 0) {
-            await FoodRestaurant.findByIdAndUpdate(restaurantId, { isListed: true });
-        }
+        await bumpApprovedFoodCount(restaurantId, 1);
     } catch (err) {
         console.error('Failed to update restaurant product count on admin food create:', err);
     }

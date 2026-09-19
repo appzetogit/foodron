@@ -46,6 +46,7 @@ const RatingsReviews = lazy(() => import("@food/pages/restaurant/RatingsReviews"
 const EditOwner = lazy(() => import("@food/pages/restaurant/EditOwner"))
 const EditRestaurantAddress = lazy(() => import("@food/pages/restaurant/EditRestaurantAddress"))
 const Inventory = lazy(() => import("@food/pages/restaurant/Inventory"))
+const BulkMenuImportPage = lazy(() => import("@food/pages/restaurant/BulkMenuImportPage"))
 const Feedback = lazy(() => import("@food/pages/restaurant/Feedback"))
 const ShareFeedback = lazy(() => import("@food/pages/restaurant/ShareFeedback"))
 const DishRatings = lazy(() => import("@food/pages/restaurant/DishRatings"))
@@ -140,6 +141,7 @@ export default function RestaurantRouter() {
           <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><EditOwner /></ProtectedRoute>} path="edit-owner" />
           <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><EditRestaurantAddress /></ProtectedRoute>} path="edit-address" />
           <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><Inventory /></ProtectedRoute>} path="inventory" />
+          <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><BulkMenuImportPage /></ProtectedRoute>} path="bulk-upload" />
           <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><Feedback /></ProtectedRoute>} path="feedback" />
           <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><ShareFeedback /></ProtectedRoute>} path="share-feedback" />
           <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><DishRatings /></ProtectedRoute>} path="dish-ratings" />

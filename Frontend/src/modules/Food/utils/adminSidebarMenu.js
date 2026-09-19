@@ -33,6 +33,7 @@ export const adminSidebarMenu = [
         subItems: [
           { label: "Restaurant Foods List", path: "/admin/food/foods", permissionKey: "list" },
           { label: "Restaurant Addons List", path: "/admin/food/addons", permissionKey: "addons" },
+          { label: "Bulk Upload", path: "/admin/food/foods/bulk-upload", permissionKey: "list" },
         ],
       },
       {

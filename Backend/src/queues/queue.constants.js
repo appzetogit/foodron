@@ -8,6 +8,7 @@ export const ORDER_QUEUE = 'order';
 export const PAYMENT_QUEUE = 'payment';
 export const TRACKING_QUEUE = 'tracking';
 export const SUBSCRIPTION_QUEUE = 'subscription';
+export const BULK_MENU_IMPORT_QUEUE = 'bulk-menu-import';
 
 export const QUEUE_NAMES = Object.freeze([
     OTP_QUEUE,
@@ -15,5 +16,6 @@ export const QUEUE_NAMES = Object.freeze([
     ORDER_QUEUE,
     PAYMENT_QUEUE,
     TRACKING_QUEUE,
-    SUBSCRIPTION_QUEUE
+    SUBSCRIPTION_QUEUE,
+    BULK_MENU_IMPORT_QUEUE
 ]);

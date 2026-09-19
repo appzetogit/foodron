@@ -88,7 +88,7 @@ const getUpdatedFoodPricing = (existing = {}, body = {}) => {
     return update;
 };
 
-const getRestaurantContext = async (restaurantId) => {
+export const getRestaurantContext = async (restaurantId) => {
     if (!restaurantId || !mongoose.Types.ObjectId.isValid(String(restaurantId))) {
         throw new ValidationError('Invalid restaurant id');
     }
@@ -118,7 +118,7 @@ const getAccessibleCategoryFilter = (context) => ({
     ]
 });
 
-const resolveCategoryForRestaurant = async (context, body = {}) => {
+const resolveCategoryUncached = async (context, body = {}) => {
     const categoryIdRaw = toStr(body.categoryId);
     const categoryNameRaw = toStr(body.categoryName);
     const foodType = normalizeFoodType(body.foodType);
@@ -193,6 +193,18 @@ const resolveCategoryForRestaurant = async (context, body = {}) => {
 };
 
 /**
+ * Public entry point for category resolution. `cache` is an optional Map shared by a batch
+ * caller (bulk import) so each distinct category/food-type combination is resolved once.
+ * Without a cache the behaviour is identical to the original single-item flow.
+ */
+export const resolveCategoryForRestaurant = (context, body = {}, cache = null) => {
+    if (!cache) return resolveCategoryUncached(context, body);
+    const key = [toStr(body.categoryId), toStr(body.categoryName).toLowerCase(), normalizeFoodType(body.foodType)].join('|');
+    if (!cache.has(key)) cache.set(key, resolveCategoryUncached(context, body));
+    return cache.get(key);
+};
+
+/**
  * Distinct existing item names for a category (across all restaurants), so a restaurant
  * owner can pick a name from what's already used instead of typing full item data by
  * hand. Purely a convenience picklist - names can be reused freely, this never blocks.
@@ -228,8 +240,18 @@ export async function listFoodNamesForCategory(categoryId, search = '') {
     return { names };
 }
 
-export async function createRestaurantFood(restaurantId, body = {}) {
-    const context = await getRestaurantContext(restaurantId);
+/**
+ * Runs every create-time validation/normalisation for a restaurant food and returns the
+ * plain document fields (no approval fields, nothing persisted). Shared by the single-item
+ * create flow and the bulk importer so the rules live in exactly one place.
+ *
+ * options (all optional, used by batch callers):
+ *  - context:       already-loaded result of getRestaurantContext
+ *  - categoryCache: Map memoising resolveCategoryForRestaurant
+ *  - slotCache:     Map memoising item-slot-timing lookups
+ */
+export async function prepareRestaurantFoodDoc(restaurantId, body = {}, options = {}) {
+    const context = options.context || await getRestaurantContext(restaurantId);
 
     const name = toStr(body.name);
     if (!name) throw new ValidationError('Item name is required');
@@ -246,10 +268,24 @@ export async function createRestaurantFood(restaurantId, body = {}) {
         throw new ValidationError('Pure veg restaurants can only add veg items');
     }
     const preparationTime = toStr(body.preparationTime);
-    const itemSlotTimingId = await resolveRestaurantItemSlotTimingId(restaurantId, body.itemSlotTimingId);
-    const { categoryObjectId, categoryName } = await resolveCategoryForRestaurant(context, { ...body, foodType });
 
-    const doc = await FoodItem.create({
+    let itemSlotTimingId;
+    const slotKey = body.itemSlotTimingId === undefined ? '__undefined__' : String(body.itemSlotTimingId);
+    if (options.slotCache && options.slotCache.has(slotKey)) {
+        itemSlotTimingId = await options.slotCache.get(slotKey);
+    } else {
+        const pending = resolveRestaurantItemSlotTimingId(restaurantId, body.itemSlotTimingId);
+        if (options.slotCache) options.slotCache.set(slotKey, pending);
+        itemSlotTimingId = await pending;
+    }
+
+    const { categoryObjectId, categoryName } = await resolveCategoryForRestaurant(
+        context,
+        { ...body, foodType },
+        options.categoryCache || null
+    );
+
+    const doc = {
         restaurantId,
         categoryId: categoryObjectId,
         categoryName: categoryName || '',
@@ -273,7 +309,20 @@ export async function createRestaurantFood(restaurantId, body = {}) {
         allergies: Array.isArray(body.allergies) ? body.allergies.map(String) : [],
         availabilityTimeStart: typeof body.availabilityTimeStart === 'string' ? body.availabilityTimeStart.trim() : '',
         availabilityTimeEnd: typeof body.availabilityTimeEnd === 'string' ? body.availabilityTimeEnd.trim() : '',
-        originalPrice: typeof body.originalPrice === 'number' ? body.originalPrice : Number(body.originalPrice) || 0,
+        originalPrice: typeof body.originalPrice === 'number' ? body.originalPrice : Number(body.originalPrice) || 0
+    };
+
+    return { context, doc };
+}
+
+/**
+ * Persists a prepared restaurant food as a pending approval request and fires the
+ * usual side effects. `options.notifyAdmins === false` suppresses the per-item admin
+ * notification (bulk import sends one summary instead).
+ */
+export async function persistRestaurantFood(preparedDoc, options = {}) {
+    const doc = await FoodItem.create({
+        ...preparedDoc,
         approvalStatus: 'pending',
         requestedAt: new Date()
     });
@@ -296,22 +345,29 @@ export async function createRestaurantFood(restaurantId, body = {}) {
             });
     }
 
-    try {
-        const { notifyAdminsSafely } = await import('../../../../core/notifications/firebase.service.js');
-        await notifyAdminsSafely({
-            title: 'New Product Approval Request 🍔',
-            body: `Restaurant has submitted a new item "${doc.name}" for approval.`,
-            data: {
-                type: 'approval_request',
-                subType: 'food',
-                id: String(doc._id)
-            }
-        });
-    } catch (err) {
-        console.error('Failed to notify admins of new food item:', err);
+    if (options.notifyAdmins !== false) {
+        try {
+            const { notifyAdminsSafely } = await import('../../../../core/notifications/firebase.service.js');
+            await notifyAdminsSafely({
+                title: 'New Product Approval Request 🍔',
+                body: `Restaurant has submitted a new item "${doc.name}" for approval.`,
+                data: {
+                    type: 'approval_request',
+                    subType: 'food',
+                    id: String(doc._id)
+                }
+            });
+        } catch (err) {
+            console.error('Failed to notify admins of new food item:', err);
+        }
     }
 
     return doc.toObject();
+}
+
+export async function createRestaurantFood(restaurantId, body = {}, options = {}) {
+    const { doc } = await prepareRestaurantFoodDoc(restaurantId, body, options);
+    return persistRestaurantFood(doc, options);
 }
 
 export async function updateRestaurantFood(restaurantId, foodId, body = {}) {
