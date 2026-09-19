@@ -16,6 +16,7 @@ export default function TaxReport() {
     dateRangeType: "All Time",
     calculateTax: "Percentage",
     taxRate: "Select Tax Rate",
+    zoneId: "",
   })
   const [reports, setReports] = useState([])
   const [stats, setStats] = useState({
@@ -27,6 +28,17 @@ export default function TaxReport() {
   const [selectedReport, setSelectedReport] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [reportDetail, setReportDetail] = useState(null)
+  const [zones, setZones] = useState([])
+
+  useEffect(() => {
+    adminAPI
+      .getZones({ limit: 1000, isActive: true, view: "summary" })
+      .then((res) => {
+        const list = res?.data?.data?.zones || []
+        setZones(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setZones([]))
+  }, [])
 
   const fetchTaxReport = async (overrideFilters = null) => {
     try {
@@ -62,6 +74,7 @@ export default function TaxReport() {
           activeFilters.taxRate && activeFilters.taxRate !== "Select Tax Rate"
             ? activeFilters.taxRate
             : undefined,
+        zoneId: activeFilters.zoneId || undefined,
       }
 
       const response = await adminAPI.getTaxReport(params)
@@ -89,13 +102,14 @@ export default function TaxReport() {
 
   useEffect(() => {
     fetchTaxReport()
-  }, [filters.dateRangeType])
+  }, [filters.dateRangeType, filters.zoneId])
 
   const handleReset = () => {
     const defaults = {
       dateRangeType: "All Time",
       calculateTax: "Percentage",
       taxRate: "Select Tax Rate",
+      zoneId: "",
     }
     setFilters(defaults)
     fetchTaxReport(defaults)
@@ -204,7 +218,24 @@ export default function TaxReport() {
             To generate you tax report please select & input following field and submit for the result.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="relative">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Zone
+              </label>
+              <select
+                value={filters.zoneId}
+                onChange={(e) => setFilters(prev => ({ ...prev, zoneId: e.target.value }))}
+                className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Zones</option>
+                {zones.map((zone) => (
+                  <option key={zone._id} value={zone._id}>{zone.zoneName || zone.name}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2 bottom-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
+            </div>
+
             <div className="relative">
               <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Date Range Type

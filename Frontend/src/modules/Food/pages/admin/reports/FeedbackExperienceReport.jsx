@@ -23,8 +23,20 @@ export default function FeedbackExperienceReport() {
     rating: "",
     experience: "",
     module: "",
+    zoneId: "",
   })
   const [isFilterOpen, setIsFilterOpen] = useState(true)
+  const [zones, setZones] = useState([])
+
+  useEffect(() => {
+    adminAPI
+      .getZones({ limit: 1000, isActive: true, view: "summary" })
+      .then((res) => {
+        const list = res?.data?.data?.zones || []
+        setZones(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setZones([]))
+  }, [])
 
   // Fetch feedback experiences
   useEffect(() => {
@@ -42,6 +54,7 @@ export default function FeedbackExperienceReport() {
         ...(filters.rating && { rating: filters.rating }),
         ...(filters.experience && { experience: filters.experience }),
         ...(filters.module && { module: filters.module }),
+        ...(filters.zoneId && { zoneId: filters.zoneId }),
       }
       const response = await adminAPI.getFeedbackExperiences(params)
       if (response.data && response.data.data) {
@@ -93,6 +106,7 @@ export default function FeedbackExperienceReport() {
       rating: "",
       experience: "",
       module: "",
+      zoneId: "",
     })
     setSearchQuery("")
   }
@@ -178,8 +192,8 @@ export default function FeedbackExperienceReport() {
     return labels[experience] || experience
   }
 
-  const activeFiltersCount = (filters.fromDate ? 1 : 0) + (filters.toDate ? 1 : 0) + 
-    (filters.rating ? 1 : 0) + (filters.experience ? 1 : 0) + (filters.module ? 1 : 0)
+  const activeFiltersCount = (filters.fromDate ? 1 : 0) + (filters.toDate ? 1 : 0) +
+    (filters.rating ? 1 : 0) + (filters.experience ? 1 : 0) + (filters.module ? 1 : 0) + (filters.zoneId ? 1 : 0)
 
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen overflow-x-hidden">
@@ -240,7 +254,24 @@ export default function FeedbackExperienceReport() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div className="relative">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Zone
+                  </label>
+                  <select
+                    value={filters.zoneId}
+                    onChange={(e) => setFilters(prev => ({ ...prev, zoneId: e.target.value }))}
+                    className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Zones</option>
+                    {zones.map((zone) => (
+                      <option key={zone._id} value={zone._id}>{zone.zoneName || zone.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 bottom-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
+                </div>
+
                 <div className="relative">
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
                     Rating

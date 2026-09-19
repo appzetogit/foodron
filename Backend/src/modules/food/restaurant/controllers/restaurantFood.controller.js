@@ -1,6 +1,15 @@
 import { sendResponse, sendError } from '../../../../utils/response.js';
-import { createRestaurantFood, updateRestaurantFood } from '../services/restaurantFood.service.js';
+import { createRestaurantFood, updateRestaurantFood, listFoodNamesForCategory } from '../services/restaurantFood.service.js';
 import { invalidateCache } from '../../../../middleware/cache.js';
+
+export const getFoodNamesController = async (req, res, next) => {
+    try {
+        const data = await listFoodNamesForCategory(req.query?.categoryId, req.query?.search);
+        return sendResponse(res, 200, 'Food names fetched successfully', data);
+    } catch (error) {
+        next(error);
+    }
+};
 
 export const createRestaurantFoodController = async (req, res, next) => {
     try {

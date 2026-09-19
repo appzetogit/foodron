@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { supportAPI } from "@food/api"
+import { supportAPI, adminAPI } from "@food/api"
 import { toast } from "sonner"
 
 const LIMIT = 50
@@ -21,9 +21,25 @@ export default function SupportTickets() {
   const [fromDate, setFromDate] = useState("")
   const [toDate, setToDate] = useState("")
   const [category, setCategory] = useState("")
-  const [filters, setFilters] = useState({ status: "", type: "", source: "all" })
+  const [filters, setFilters] = useState({ status: "", type: "", source: "all", zoneId: "" })
   const [editing, setEditing] = useState({})
   const [expandedDesc, setExpandedDesc] = useState({})
+  const [zones, setZones] = useState([])
+
+  useEffect(() => {
+    let cancelled = false
+    adminAPI
+      .getZones({ limit: 1000, isActive: true, view: "summary" })
+      .then((res) => {
+        if (cancelled) return
+        const list = res?.data?.data?.zones || res?.data?.zones || []
+        setZones(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setZones([]))
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const limit = LIMIT
   const totalPages = Math.max(1, Math.ceil((total || 0) / limit))
@@ -82,6 +98,7 @@ export default function SupportTickets() {
         ...(fromDate && { fromDate }),
         ...(toDate && { toDate }),
         ...(filters.source === "restaurant" && category && { category }),
+        ...(filters.zoneId && { zoneId: filters.zoneId }),
       }
       const res = await supportAPI.getSupportTicketsAdmin(params)
       const data = res?.data?.data || res?.data || {}
@@ -120,7 +137,7 @@ export default function SupportTickets() {
       }
     }
     loadRef.current()
-  }, [page, debouncedSearch, filters.status, filters.type, filters.source, fromDate, toDate, category])
+  }, [page, debouncedSearch, filters.status, filters.type, filters.source, filters.zoneId, fromDate, toDate, category])
 
   const resetPage = () => setPage(1)
 
@@ -257,6 +274,22 @@ export default function SupportTickets() {
                   <option value="other">Other</option>
                 </select>
               )}
+              <select
+                value={filters.zoneId}
+                onChange={(e) => {
+                  setFilters((p) => ({ ...p, zoneId: e.target.value }))
+                  resetPage()
+                }}
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                title="Filter by zone (tickets linked to a restaurant in the zone)"
+              >
+                <option value="">All Zones</option>
+                {zones.map((zone) => (
+                  <option key={zone._id} value={zone._id}>
+                    {zone.zoneName || zone.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

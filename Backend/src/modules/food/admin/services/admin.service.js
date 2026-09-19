@@ -1400,7 +1400,19 @@ export async function getTransactionReport(query = {}) {
 
     if (zone || restaurant) {
         const restFilter = {};
-        if (zone) restFilter.zoneId = zone;
+        if (zone) {
+            const zoneRaw = String(zone).trim();
+            if (mongoose.Types.ObjectId.isValid(zoneRaw)) {
+                restFilter.zoneId = new mongoose.Types.ObjectId(zoneRaw);
+            } else {
+                const matchedZone = await FoodZone.findOne({
+                    $or: [{ name: zoneRaw }, { zoneName: zoneRaw }]
+                })
+                    .select('_id')
+                    .lean();
+                restFilter.zoneId = matchedZone?._id || null;
+            }
+        }
         if (restaurant && restaurant !== 'All restaurants') {
             const restDoc = await mongoose.model('FoodRestaurant').findOne({ restaurantName: restaurant }).lean();
             if (restDoc) restFilter._id = restDoc._id;
@@ -1825,7 +1837,7 @@ export async function getRestaurantReport(query = {}) {
 }
 
 export async function getTaxReport(query = {}) {
-    const { fromDate, toDate, search, calculateTax, taxRate } = query;
+    const { fromDate, toDate, search, calculateTax, taxRate, zoneId } = query;
     const match = {
         orderType: 'food',
         orderStatus: 'delivered' // Typically tax is reported on delivered/completed orders
@@ -1838,6 +1850,10 @@ export async function getTaxReport(query = {}) {
     if (search) {
         // Search by order ID if provided
         match.orderId = { $regex: search, $options: 'i' };
+    }
+
+    if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
+        match.zoneId = new mongoose.Types.ObjectId(zoneId);
     }
 
     // Taxable income = food subtotal (GST is calculated on subtotal in order-pricing).
@@ -2550,6 +2566,16 @@ export async function getSupportTickets(query = {}) {
     }
     if (userSearchOr.length) userFilter.$or = userSearchOr;
     if (restaurantSearchOr.length) restaurantFilter.$or = restaurantSearchOr;
+
+    const zoneId = String(query.zoneId || '').trim();
+    if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
+        const zoneRestaurantIds = await FoodRestaurant.find({ zoneId }).select('_id').lean();
+        const ids = zoneRestaurantIds.map((r) => r._id);
+        // Tickets not tied to a restaurant can't be attributed to a zone; scoping to
+        // restaurantId keeps this filter cheap without needing a zoneId snapshot per ticket.
+        userFilter.restaurantId = { $in: ids };
+        restaurantFilter.restaurantId = { $in: ids };
+    }
 
     const shouldFetchUser = source === 'all' || source === 'user';
     const shouldFetchRestaurant = source === 'all' || source === 'restaurant';
@@ -5042,6 +5068,44 @@ const getAdminFoodUpdatedPricing = (existing = {}, body = {}) => {
     return update;
 };
 
+/**
+ * Distinct existing item names for a category, so the admin can pick a name from what's
+ * already used in that category (across all restaurants) instead of typing full item
+ * data by hand. This is purely a convenience picklist - the same name can legitimately
+ * be reused by multiple items (different restaurants, or intentional variants), so this
+ * never blocks anything; it only feeds the autocomplete dropdown.
+ */
+export async function listFoodNamesForCategory(query = {}) {
+    const categoryId = String(query.categoryId || '').trim();
+    if (!categoryId || !mongoose.Types.ObjectId.isValid(categoryId)) {
+        return { names: [] };
+    }
+
+    const filter = { categoryId };
+    const search = String(query.search || '').trim();
+    if (search) {
+        filter.name = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    }
+
+    const items = await FoodItem.find(filter)
+        .select('name')
+        .sort({ name: 1 })
+        .limit(50)
+        .lean();
+
+    const seen = new Set();
+    const names = [];
+    for (const item of items) {
+        const trimmed = String(item.name || '').trim();
+        const key = trimmed.toLowerCase();
+        if (!trimmed || seen.has(key)) continue;
+        seen.add(key);
+        names.push(trimmed);
+    }
+
+    return { names };
+}
+
 export async function createFood(body) {
     const restaurantId = body.restaurantId;
     if (!restaurantId || !mongoose.Types.ObjectId.isValid(restaurantId)) {
@@ -5156,6 +5220,7 @@ export async function updateFood(id, body) {
         doc.categoryId = categoryId;
         doc.categoryName = categoryName;
     }
+
     await doc.save();
     return doc.toObject();
 }

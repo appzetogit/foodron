@@ -581,6 +581,15 @@ export async function getFoods(req, res, next) {
     }
 }
 
+export async function getFoodNames(req, res, next) {
+    try {
+        const data = await adminService.listFoodNamesForCategory(req.query || {});
+        res.status(200).json({ success: true, message: 'Food names fetched successfully', data });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export async function getFoodById(req, res, next) {
     try {
         const { id } = req.params;

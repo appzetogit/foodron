@@ -7,6 +7,9 @@ const safetyEmergencyReportSchema = new mongoose.Schema(
         userEmail: { type: String, default: '' },
         userPhone: { type: String, default: '' },
         message: { type: String, required: true, trim: true, maxlength: 4000 },
+        latitude: { type: Number, default: null },
+        longitude: { type: Number, default: null },
+        address: { type: String, default: '' },
         status: {
             type: String,
             enum: ['unread', 'read', 'urgent', 'resolved'],

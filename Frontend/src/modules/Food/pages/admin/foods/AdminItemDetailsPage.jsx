@@ -181,6 +181,13 @@ export default function AdminItemDetailsPage() {
   const debounceTimerRef = useRef(null)
   const suggestionCacheRef = useRef({ queryKey: "", results: [] })
 
+  // Existing item names within the selected category, so admins can pick an
+  // existing name instead of typing the whole item out by hand. Names can repeat
+  // freely (different restaurants, intentional variants) - this is a picker only.
+  const [existingItemNames, setExistingItemNames] = useState([])
+  const [isNameSuggestionsOpen, setIsNameSuggestionsOpen] = useState(false)
+  const nameDebounceTimerRef = useRef(null)
+
   const selectableCategories = useMemo(
     () => filterCategoriesForRestaurant(categories, { pureVegRestaurant: isPureVegRestaurant }),
     [categories, isPureVegRestaurant],
@@ -331,6 +338,38 @@ export default function AdminItemDetailsPage() {
       }
     }
   }, [itemName, category])
+
+  // Fetch existing item names for the selected category (across all restaurants) so
+  // the admin can pick one from the list instead of typing full item data by hand.
+  // This is a convenience picklist only - the same name can be reused freely.
+  useEffect(() => {
+    if (nameDebounceTimerRef.current) {
+      clearTimeout(nameDebounceTimerRef.current)
+    }
+    const categoryId = String(selectedCategoryId || "").trim()
+    if (!isRealCategoryId(categoryId)) {
+      setExistingItemNames([])
+      return
+    }
+    nameDebounceTimerRef.current = setTimeout(async () => {
+      try {
+        const response = await adminAPI.getFoodNames({ categoryId })
+        const names = response?.data?.data?.names
+        setExistingItemNames(Array.isArray(names) ? names : [])
+      } catch (err) {
+        debugError("Error fetching existing item names:", err)
+        setExistingItemNames([])
+      }
+    }, 350)
+    return () => {
+      if (nameDebounceTimerRef.current) clearTimeout(nameDebounceTimerRef.current)
+    }
+  }, [selectedCategoryId])
+
+  const trimmedItemName = itemName.trim().toLowerCase()
+  const nameSuggestionMatches = trimmedItemName
+    ? existingItemNames.filter((n) => n.toLowerCase().includes(trimmedItemName))
+    : existingItemNames
 
   // Restore draft if exists
   useEffect(() => {
@@ -1734,16 +1773,43 @@ export default function AdminItemDetailsPage() {
                         type="text"
                         value={itemName}
                         onChange={(e) => setItemName(e.target.value)}
+                        onFocus={() => setIsNameSuggestionsOpen(true)}
+                        onBlur={() => setTimeout(() => setIsNameSuggestionsOpen(false), 150)}
                         maxLength={maxNameLength}
                         className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Enter item name"
+                        placeholder={
+                          isRealCategoryId(selectedCategoryId)
+                            ? "Enter or pick an existing item name"
+                            : "Select a category first, or enter item name"
+                        }
                       />
                       <button className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100">
                         <EditIcon className="w-4 h-4 text-gray-500" />
                       </button>
+                      {isNameSuggestionsOpen && isRealCategoryId(selectedCategoryId) && nameSuggestionMatches.length > 0 && (
+                        <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                          {nameSuggestionMatches.map((name) => (
+                            <button
+                              key={name}
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                setItemName(name)
+                                setIsNameSuggestionsOpen(false)
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50"
+                            >
+                              {name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right mt-1">
-                      <span className="text-xs text-gray-500">
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-xs text-gray-400">
+                        {isRealCategoryId(selectedCategoryId) ? "Pick an existing name or type a new one." : ""}
+                      </span>
+                      <span className="text-xs text-gray-500 shrink-0">
                         {nameLength} / {maxNameLength}
                       </span>
                     </div>

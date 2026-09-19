@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react"
-import { Search, ArrowUpDown, Settings, Folder, ChevronDown, Eye, Trash2, AlertTriangle, Loader2 } from "lucide-react"
+import { Search, ArrowUpDown, Settings, Folder, ChevronDown, Eye, Trash2, AlertTriangle, Loader2, MapPin } from "lucide-react"
 import { toast } from "sonner"
 import { adminAPI } from "@food/api"
 import {
@@ -269,6 +269,9 @@ export default function SafetyEmergencyReports() {
                   </div>
                 </th>
                 <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                  <span>Location</span>
+                </th>
+                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                   <div className="flex items-center gap-2">
                     <span>Priority</span>
                     <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
@@ -291,7 +294,7 @@ export default function SafetyEmergencyReports() {
             <tbody className="bg-white divide-y divide-slate-100">
               {filteredReports.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-20">
+                  <td colSpan={7} className="px-6 py-20">
                     <div className="flex flex-col items-center justify-center">
                       <div className="relative mb-6">
                         <div className="w-32 h-32 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center shadow-inner">
@@ -326,6 +329,22 @@ export default function SafetyEmergencyReports() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm text-slate-700">{report.userEmail || "NA"}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {Number.isFinite(report.latitude) && Number.isFinite(report.longitude) ? (
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${report.latitude},${report.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
+                          title={report.address || "Open location in Google Maps"}
+                        >
+                          <MapPin className="w-3.5 h-3.5" />
+                          View
+                        </a>
+                      ) : (
+                        <span className="text-xs text-slate-400">Not shared</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getPriorityBadge(report.priority)}
@@ -491,6 +510,28 @@ export default function SafetyEmergencyReports() {
                   </p>
                 </div>
               </div>
+
+              {/* Location Section */}
+              {Number.isFinite(selectedReport.latitude) && Number.isFinite(selectedReport.longitude) && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-5 border border-blue-200 dark:border-blue-800">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-3">
+                    <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-blue-600 rounded-full"></div>
+                    Reported Location
+                  </h3>
+                  <p className="text-sm text-slate-700 dark:text-slate-300 mb-3">
+                    {selectedReport.address || `${selectedReport.latitude}, ${selectedReport.longitude}`}
+                  </p>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${selectedReport.latitude},${selectedReport.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline"
+                  >
+                    <MapPin className="w-4 h-4" />
+                    Open in Google Maps
+                  </a>
+                </div>
+              )}
 
               {/* Priority and Status Section */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

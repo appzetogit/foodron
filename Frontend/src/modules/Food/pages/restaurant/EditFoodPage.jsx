@@ -74,6 +74,13 @@ export default function EditFoodPage() {
   const [isPureVegRestaurant, setIsPureVegRestaurant] = useState(false)
   const [isCategoryInactive, setIsCategoryInactive] = useState(false)
 
+  // Existing item names within the selected category (across all restaurants), so the
+  // owner can pick a name from the list instead of typing full item data by hand.
+  // This is a convenience picklist only - names can be reused freely, nothing is blocked.
+  const [existingItemNames, setExistingItemNames] = useState([])
+  const [isNameSuggestionsOpen, setIsNameSuggestionsOpen] = useState(false)
+  const nameDebounceTimerRef = useRef(null)
+
   // Lenis smooth scrolling
   useEffect(() => {
     const lenis = new Lenis({
@@ -216,6 +223,36 @@ export default function EditFoodPage() {
       isMounted = false
     }
   }, [isNewFood])
+
+  // Fetch existing item names for the selected category so the owner can pick one
+  // from the list instead of typing full item data by hand.
+  useEffect(() => {
+    if (nameDebounceTimerRef.current) {
+      clearTimeout(nameDebounceTimerRef.current)
+    }
+    const categoryId = String(formData.category || "").trim()
+    if (!isRealCategoryId(categoryId)) {
+      setExistingItemNames([])
+      return
+    }
+    nameDebounceTimerRef.current = setTimeout(async () => {
+      try {
+        const response = await restaurantAPI.getFoodNames({ categoryId })
+        const names = response?.data?.data?.names
+        setExistingItemNames(Array.isArray(names) ? names : [])
+      } catch {
+        setExistingItemNames([])
+      }
+    }, 350)
+    return () => {
+      if (nameDebounceTimerRef.current) clearTimeout(nameDebounceTimerRef.current)
+    }
+  }, [formData.category])
+
+  const trimmedFoodName = String(formData.name || "").trim().toLowerCase()
+  const nameSuggestionMatches = trimmedFoodName
+    ? existingItemNames.filter((n) => n.toLowerCase().includes(trimmedFoodName))
+    : existingItemNames
 
   // Dynamically verify the selected category's live status so we can warn (and block)
   // when the admin has deactivated it. The status is always fetched fresh from the
@@ -605,13 +642,43 @@ export default function EditFoodPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Food Name (English)
                   </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange("name", e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff8100] focus:border-transparent outline-none"
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => handleInputChange("name", e.target.value)}
+                      onFocus={() => setIsNameSuggestionsOpen(true)}
+                      onBlur={() => setTimeout(() => setIsNameSuggestionsOpen(false), 150)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff8100] focus:border-transparent outline-none"
+                      placeholder={
+                        isRealCategoryId(formData.category)
+                          ? "Enter or pick an existing item name"
+                          : "Select a category first, or enter item name"
+                      }
+                      required
+                    />
+                    {isNameSuggestionsOpen && isRealCategoryId(formData.category) && nameSuggestionMatches.length > 0 && (
+                      <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {nameSuggestionMatches.map((name) => (
+                          <button
+                            key={name}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              handleInputChange("name", name)
+                              setIsNameSuggestionsOpen(false)
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50"
+                          >
+                            {name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {isRealCategoryId(formData.category) && (
+                    <p className="text-xs text-gray-400 mt-1">Pick an existing name or type a new one.</p>
+                  )}
                 </div>
 
                 <div>

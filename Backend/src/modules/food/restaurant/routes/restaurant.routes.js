@@ -47,7 +47,8 @@ import {
 } from '../controllers/outletTimings.controller.js';
 import {
     createRestaurantFoodController,
-    updateRestaurantFoodController
+    updateRestaurantFoodController,
+    getFoodNamesController
 } from '../controllers/restaurantFood.controller.js';
 import {
     createItemSlotTimingController,
@@ -308,6 +309,7 @@ router.get('/restaurants/:id/addons', cacheResponse(600, 'restaurant_addons'), g
 // Foods (restaurant creates/updates items -> stored in food_items collection)
 // The public category list only keeps categories that still have an orderable item, so
 // item changes have to drop the category cache alongside the menu caches.
+router.get('/foods/names', authMiddleware, requireRestaurant, getFoodNamesController);
 router.post('/foods', authMiddleware, requireRestaurant, requireApprovedRestaurant, invalidateCategoryCacheMiddleware, createRestaurantFoodController);
 router.patch('/foods/:id', authMiddleware, requireRestaurant, requireApprovedRestaurant, invalidateCategoryCacheMiddleware, updateRestaurantFoodController);
 

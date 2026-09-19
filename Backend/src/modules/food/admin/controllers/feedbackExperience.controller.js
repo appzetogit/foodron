@@ -1,4 +1,5 @@
 import { FeedbackExperience } from '../models/feedbackExperience.model.js';
+import { FoodRestaurant } from '../../restaurant/models/restaurant.model.js';
 import { sendResponse, sendError } from '../../../../utils/response.js';
 
 /**
@@ -50,11 +51,16 @@ export const createFeedbackExperience = async (req, res) => {
  */
 export const getFeedbackExperiences = async (req, res) => {
     try {
-        const { module, page = 1, limit = 10, startDate, endDate, rating, experience } = req.query;
+        const { module, page = 1, limit = 10, startDate, endDate, rating, experience, zoneId } = req.query;
         const query = {};
-        
+
         if (module) {
             query.module = module;
+        }
+
+        if (zoneId) {
+            const zoneRestaurants = await FoodRestaurant.find({ zoneId }).select('_id').lean();
+            query.restaurantId = { $in: zoneRestaurants.map((r) => r._id) };
         }
 
         // Date filter

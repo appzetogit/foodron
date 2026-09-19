@@ -682,6 +682,9 @@ export const adminAPI = {
     apiClient.get("/food/admin/foods", { params, contextModule: "admin" }),
   getFoodById: (id) =>
     apiClient.get(`/food/admin/foods/${String(id)}`, { contextModule: "admin" }),
+  /** Existing item names for a category (for the "pick from list" autocomplete). */
+  getFoodNames: (params = {}) =>
+    apiClient.get("/food/admin/foods/names", { params, contextModule: "admin" }),
   createFood: (body) =>
     apiClient.post("/food/admin/foods", body ?? {}, { contextModule: "admin" }),
   updateFood: (id, body) =>
@@ -1548,6 +1551,12 @@ export const restaurantAPI = {
       { contextModule: "restaurant" },
     ),
   /** Foods (restaurant) - stored in food_items collection */
+  /** Existing item names for a category (for the "pick from list" autocomplete). */
+  getFoodNames: (params = {}) =>
+    apiClient.get("/food/restaurant/foods/names", {
+      params,
+      contextModule: "restaurant",
+    }),
   createFood: (body) =>
     apiClient.post("/food/restaurant/foods", body ?? {}, {
       contextModule: "restaurant",
@@ -2812,10 +2821,15 @@ export const userAPI = {
       return res;
     }),
   /** POST /food/user/safety-emergency-reports (Bearer USER) */
-  createSafetyEmergencyReport: (message) =>
+  createSafetyEmergencyReport: (message, location = {}) =>
     apiClient.post(
       "/food/user/safety-emergency-reports",
-      { message: String(message || "") },
+      {
+        message: String(message || ""),
+        ...(Number.isFinite(location?.latitude) && Number.isFinite(location?.longitude)
+          ? { latitude: location.latitude, longitude: location.longitude }
+          : {}),
+      },
       { contextModule: "user" },
     ),
   /** GET /food/user/safety-emergency-reports (Bearer USER) */

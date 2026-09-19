@@ -192,6 +192,42 @@ const resolveCategoryForRestaurant = async (context, body = {}) => {
     };
 };
 
+/**
+ * Distinct existing item names for a category (across all restaurants), so a restaurant
+ * owner can pick a name from what's already used instead of typing full item data by
+ * hand. Purely a convenience picklist - names can be reused freely, this never blocks.
+ */
+export async function listFoodNamesForCategory(categoryId, search = '') {
+    const id = toStr(categoryId);
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+        return { names: [] };
+    }
+
+    const filter = { categoryId: id };
+    const term = toStr(search);
+    if (term) {
+        filter.name = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    }
+
+    const items = await FoodItem.find(filter)
+        .select('name')
+        .sort({ name: 1 })
+        .limit(50)
+        .lean();
+
+    const seen = new Set();
+    const names = [];
+    for (const item of items) {
+        const trimmed = toStr(item.name);
+        const key = trimmed.toLowerCase();
+        if (!trimmed || seen.has(key)) continue;
+        seen.add(key);
+        names.push(trimmed);
+    }
+
+    return { names };
+}
+
 export async function createRestaurantFood(restaurantId, body = {}) {
     const context = await getRestaurantContext(restaurantId);
 

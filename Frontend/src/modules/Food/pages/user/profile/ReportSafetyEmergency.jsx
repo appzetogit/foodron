@@ -90,6 +90,19 @@ export default function ReportSafetyEmergency() {
     }
   }
 
+  const getCurrentLocation = () =>
+    new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve(null)
+        return
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
+      )
+    })
+
   const handleSubmit = async () => {
     if (!report.trim()) {
       toast.error('Please describe the safety concern or emergency')
@@ -98,8 +111,11 @@ export default function ReportSafetyEmergency() {
 
     try {
       setIsSubmitting(true)
-      const response = await userAPI.createSafetyEmergencyReport(report.trim())
-      
+      // One-shot browser geolocation read (no map/JS map API involved) so the
+      // admin panel can see where the report was sent from.
+      const location = await getCurrentLocation()
+      const response = await userAPI.createSafetyEmergencyReport(report.trim(), location || {})
+
       if (response.data.success) {
         setIsSubmitted(true)
         setReport("")

@@ -125,6 +125,7 @@ router.patch('/addons/:id/reject', checkPermission('food::food_management::foods
 // ----- Foods -----
 router.get('/foods', checkPermission('food::food_management::foods::list', 'view'), adminController.getFoods);
 router.get('/foods/pending-approvals', checkPermission('food::food_management::food_approval', 'view'), foodApprovalController.getPendingFoodApprovals);
+router.get('/foods/names', checkPermission('food::food_management::foods::list', 'view'), adminController.getFoodNames);
 router.get('/foods/:id', checkPermission('food::food_management::foods::list', 'view'), adminController.getFoodById);
 router.post('/foods', checkPermission('food::food_management::foods::list', 'create'), adminController.createFood);
 router.patch('/foods/:id', checkPermission('food::food_management::foods::list', 'edit'), adminController.updateFood);

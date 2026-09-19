@@ -64,6 +64,39 @@ export const getDistance = async (req, res) => {
   }
 };
 
+/**
+ * Reusable reverse-geocode call for server-side (non-HTTP) callers, e.g. resolving a
+ * human-readable address once when a report is created, instead of embedding a live
+ * map widget that would reload the Maps JS API on every admin page view.
+ * Returns null on any failure instead of throwing, so callers can treat it as best-effort.
+ */
+export const reverseGeocodeCoordinates = async (lat, lng) => {
+  const apiKey = getMapsApiKey();
+  if (!apiKey || lat === null || lat === undefined || lng === null || lng === undefined) return null;
+
+  try {
+    const { data } = await axios.get(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}&language=en`,
+      { timeout: MAPS_TIMEOUT_MS },
+    );
+
+    if (data.status !== 'OK' || !data.results?.[0]) return null;
+
+    const first = data.results[0];
+    const components = mapAddressComponents(first.address_components || []);
+
+    return {
+      formattedAddress: first.formatted_address,
+      placeId: first.place_id,
+      latitude: lat,
+      longitude: lng,
+      ...components,
+    };
+  } catch {
+    return null;
+  }
+};
+
 export const reverseGeocode = async (req, res) => {
   try {
     const lat = toFinite(req.query.lat ?? req.query.latitude);
