@@ -17,6 +17,7 @@ let server = null;
 let expireOffersInterval = null;
 let fssaiExpiryInterval = null;
 let foodScheduledReconcileInterval = null;
+let adBillingInterval = null;
 
 const gracefulShutdown = async (signal) => {
     logger.info(`${signal} received, starting graceful shutdown`);
@@ -32,6 +33,7 @@ const gracefulShutdown = async (signal) => {
             if (expireOffersInterval) clearInterval(expireOffersInterval);
             if (fssaiExpiryInterval) clearInterval(fssaiExpiryInterval);
             if (foodScheduledReconcileInterval) clearInterval(foodScheduledReconcileInterval);
+            if (adBillingInterval) clearInterval(adBillingInterval);
             logger.info('Graceful shutdown complete');
             process.exit(0);
         } catch (err) {
@@ -150,6 +152,22 @@ const startServer = async () => {
         };
         runFoodScheduledReconcile();
         foodScheduledReconcileInterval = setInterval(runFoodScheduledReconcile, 60 * 1000);
+
+        // Advertisement billing: books admin's daily % share for every completed live
+        // ad day (idempotent — unique ad+day rows). Also runs lazily on finance reads.
+        const runAdBilling = async () => {
+            try {
+                const { settleAdvertisementCharges } = await import(
+                    './src/modules/food/admin/services/advertisementBilling.service.js'
+                );
+                const res = await settleAdvertisementCharges();
+                if (res?.charged) logger.info(`[AdBilling] booked ${res.charged} ad-day charge(s)`);
+            } catch (err) {
+                logger.error(`Ad billing error: ${err.message}`);
+            }
+        };
+        runAdBilling();
+        adBillingInterval = setInterval(runAdBilling, 30 * 60 * 1000);
 
         process.on('SIGINT', () => gracefulShutdown('SIGINT'));
         process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

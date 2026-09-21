@@ -393,6 +393,17 @@ const restaurantSchema = new mongoose.Schema(
       min: 0,
       max: 100
     },
+    /**
+     * Advertisement revenue share (admin-set, per restaurant). Percentage of the
+     * restaurant's daily order earnings (restaurantShare) charged for every live
+     * banner/image ad day. 0 = ads are free for this restaurant.
+     */
+    adCommissionPercentage: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100
+    },
     isDeleted: {
       type: Boolean,
       default: false

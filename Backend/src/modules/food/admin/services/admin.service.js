@@ -50,6 +50,7 @@ import { FoodTransaction } from '../../orders/models/foodTransaction.model.js';
 import { Transaction } from '../../../../core/payments/models/transaction.model.js';
 import { buildOrderIdentityFilter } from '../../orders/services/order.helpers.js';
 import { FoodRestaurantWithdrawal } from '../../restaurant/models/foodRestaurantWithdrawal.model.js';
+import { getAdRevenueForDashboard } from './advertisementBilling.service.js';
 import { applyPendingOpenDaysUpdate, discardPendingOpenDaysUpdate, syncOutletTimingsFromOpenDays } from '../../restaurant/services/outletTimings.service.js';
 import { buildPaginationMeta, buildPaginationOptions } from '../../../../utils/helpers.js';
 // import { applyPendingOpenDaysUpdate, discardPendingOpenDaysUpdate } from '../../restaurant/services/outletTimings.service.js';
@@ -1104,7 +1105,11 @@ export async function getDashboardStats(query = {}) {
         };
     });
 
+    // Advertisement revenue share booked for the selected period (separate from order earnings).
+    const adRevenue = await getAdRevenueForDashboard(zoneId ? null : periodRange).catch(() => ({ total: 0, days: 0 }));
+
     const result = {
+        adRevenue,
         orders: {
             total: Number(totals.totalOrders || 0),
             byStatus: {
@@ -1272,6 +1277,16 @@ const mapTransactionReportRow = (tx) => {
         itemDiscount,
         couponDiscount,
         referralDiscount,
+        // Menu-discount funding split (admin vs restaurant) + what each side finally earned
+        menuDiscount: Number(tx.amounts?.menuDiscount ?? tx.pricing?.menuDiscount ?? 0) || 0,
+        menuDiscountPercentage: Number(tx.pricing?.menuDiscountInfo?.percentage ?? 0) || 0,
+        menuDiscountSource: tx.pricing?.menuDiscountInfo?.source || '',
+        menuDiscountAdminShare: Number(tx.amounts?.menuAdminDiscountShare || 0) || 0,
+        menuDiscountRestaurantShare: Number(tx.amounts?.menuRestaurantDiscountShare || 0) || 0,
+        adminDiscountShare: Number(tx.amounts?.adminDiscountShare || 0) || 0,
+        restaurantDiscountShare: Number(tx.amounts?.restaurantDiscountShare || 0) || 0,
+        restaurantEarning: Number(tx.amounts?.restaurantShare || 0) || 0,
+        adminEarning: Number(tx.amounts?.platformNetProfit || 0) || 0,
         discountedAmount: Math.max(0, subtotal - totalDiscount),
         vatTax: tx.amounts?.taxAmount || pricing.tax || 0,
         deliveryCharge: pricing.deliveryFee || 0,
@@ -1367,6 +1382,48 @@ const buildTransactionReportSummaryPipeline = () => ([
                             ]
                         },
                         { $ifNull: ['$amounts.riderShare', 0] },
+                        0
+                    ]
+                }
+            },
+            menuDiscountTotal: {
+                $sum: {
+                    $cond: [
+                        {
+                            $or: [
+                                { $in: ['$status', ['captured', 'settled']] },
+                                { $eq: ['$order.orderStatus', 'delivered'] }
+                            ]
+                        },
+                        { $add: [{ $ifNull: ['$amounts.menuAdminDiscountShare', 0] }, { $ifNull: ['$amounts.menuRestaurantDiscountShare', 0] }] },
+                        0
+                    ]
+                }
+            },
+            menuDiscountAdminBorne: {
+                $sum: {
+                    $cond: [
+                        {
+                            $or: [
+                                { $in: ['$status', ['captured', 'settled']] },
+                                { $eq: ['$order.orderStatus', 'delivered'] }
+                            ]
+                        },
+                        { $ifNull: ['$amounts.menuAdminDiscountShare', 0] },
+                        0
+                    ]
+                }
+            },
+            menuDiscountRestaurantBorne: {
+                $sum: {
+                    $cond: [
+                        {
+                            $or: [
+                                { $in: ['$status', ['captured', 'settled']] },
+                                { $eq: ['$order.orderStatus', 'delivered'] }
+                            ]
+                        },
+                        { $ifNull: ['$amounts.menuRestaurantDiscountShare', 0] },
                         0
                     ]
                 }
@@ -1467,6 +1524,9 @@ export async function getTransactionReport(query = {}) {
         refundedTransaction: Number(summaryDoc.refundedTransaction || 0),
         adminEarning: Number(summaryDoc.adminEarning || 0),
         restaurantEarning: Number(summaryDoc.restaurantEarning || 0),
+        menuDiscountTotal: Number(summaryDoc.menuDiscountTotal || 0),
+        menuDiscountAdminBorne: Number(summaryDoc.menuDiscountAdminBorne || 0),
+        menuDiscountRestaurantBorne: Number(summaryDoc.menuDiscountRestaurantBorne || 0),
         deliverymanOrderEarning,
         deliverymanAddonEarning,
         deliverymanEarning: deliverymanOrderEarning + deliverymanAddonEarning,

@@ -31,6 +31,7 @@ export default function NewAdvertisementPage() {
   const goBack = useRestaurantBackNavigation()
   const keyboardInset = useKeyboardInset()
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
+  const [adRate, setAdRate] = useState(null)
   const [showStartDatePicker, setShowStartDatePicker] = useState(false)
   const [showEndDatePicker, setShowEndDatePicker] = useState(false)
   const [formData, setFormData] = useState({
@@ -39,16 +40,13 @@ export default function NewAdvertisementPage() {
     endDate: "",
     title: "",
     description: "",
-    fileDescription: "",
-    videoDescription: ""
+    fileDescription: ""
   })
   const [uploadedFile, setUploadedFile] = useState(null)
-  const [uploadedVideo, setUploadedVideo] = useState(null)
   const categoryRef = useRef(null)
   const startDateRef = useRef(null)
   const endDateRef = useRef(null)
   const fileInputRef = useRef(null)
-  const videoInputRef = useRef(null)
   const [isPhotoPickerOpen, setIsPhotoPickerOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const minStartDate = todayISO()
@@ -58,22 +56,18 @@ export default function NewAdvertisementPage() {
     return URL.createObjectURL(uploadedFile)
   }, [uploadedFile])
 
-  const videoPreviewUrl = useMemo(() => {
-    if (!uploadedVideo) return null
-    return URL.createObjectURL(uploadedVideo)
-  }, [uploadedVideo])
+  useEffect(() => {
+    restaurantAPI
+      .getAdvertisementBilling({ limit: 1 })
+      .then((res) => setAdRate(Number(res?.data?.data?.percentage) || 0))
+      .catch(() => setAdRate(null))
+  }, [])
 
   useEffect(() => {
     return () => {
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl)
     }
   }, [imagePreviewUrl])
-
-  useEffect(() => {
-    return () => {
-      if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl)
-    }
-  }, [videoPreviewUrl])
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -95,7 +89,6 @@ export default function NewAdvertisementPage() {
   }, [])
 
   const categories = [
-    "Video Promotion",
     "Restaurant Promotion",
     "Image Promotion",
     "Banner Promotion"
@@ -129,16 +122,6 @@ export default function NewAdvertisementPage() {
 
     if (type === "file") {
       handleFileSelect(file)
-    } else if (type === "video") {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("Video size too large. Max 5MB allowed.")
-        return
-      }
-      setUploadedVideo(file)
-      setFormData((prev) => ({
-        ...prev,
-        videoDescription: prev.videoDescription?.trim() ? prev.videoDescription : file.name,
-      }))
     }
     e.target.value = ""
   }
@@ -154,7 +137,6 @@ export default function NewAdvertisementPage() {
     return `${text.length}/${maxLength}`
   }
 
-  const isVideoPromotion = formData.category === "Video Promotion"
   const requiresImage = ["Image Promotion", "Banner Promotion", "Restaurant Promotion"].includes(formData.category)
 
   const handleCreate = async () => {
@@ -178,10 +160,6 @@ export default function NewAdvertisementPage() {
       toast.error("End date must be on or after start date")
       return
     }
-    if (formData.category === "Video Promotion" && !uploadedVideo) {
-      toast.error("Please upload a video for Video Promotion")
-      return
-    }
     if (requiresImage && !uploadedFile) {
       toast.error("Please upload an image for this advertisement type")
       return
@@ -196,9 +174,7 @@ export default function NewAdvertisementPage() {
       payload.append("category", formData.category)
       payload.append("validity", `${formData.startDate.trim()} to ${formData.endDate.trim()}`)
       payload.append("fileDescription", formData.fileDescription || "")
-      payload.append("videoDescription", formData.videoDescription || "")
       if (uploadedFile) payload.append("image", uploadedFile)
-      if (uploadedVideo) payload.append("video", uploadedVideo)
 
       await restaurantAPI.createAdvertisement(payload)
       toast.success("Advertisement submitted for approval")
@@ -227,6 +203,13 @@ export default function NewAdvertisementPage() {
 
       {/* Main Content */}
       <div className="px-4 py-4 space-y-4">
+        {adRate != null && (
+          <div className={`rounded-xl border p-3 text-xs ${adRate > 0 ? "border-amber-200 bg-amber-50 text-amber-800" : "border-green-200 bg-green-50 text-green-800"}`}>
+            {adRate > 0
+                ? `Ad charge: ${adRate}% of your order earnings for each day this ad is live. It is deducted from your wallet at the end of every active day (only for the dates you select, and only after admin approval).`
+                : "No ad charges are set for your restaurant, so this ad is free."}
+          </div>
+        )}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -259,11 +242,6 @@ export default function NewAdvertisementPage() {
                         type="button"
                         onClick={() => {
                           handleInputChange("category", category)
-                          if (category === "Video Promotion") {
-                            setUploadedFile(null)
-                          } else {
-                            setUploadedVideo(null)
-                          }
                           setShowCategoryDropdown(false)
                         }}
                         className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg"
@@ -467,87 +445,6 @@ export default function NewAdvertisementPage() {
         </motion.div>
         )}
 
-        {isVideoPromotion && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.2 }}
-        >
-          <Card className="bg-white shadow-sm border border-gray-100">
-            <CardContent className="p-4 space-y-4">
-              <h2 className="text-base font-bold text-gray-900">
-                Upload Files <span className="text-red-500">*</span>
-              </h2>
-
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-                <input
-                  ref={videoInputRef}
-                  type="file"
-                  id="video-upload"
-                  onChange={(e) => handleFileUpload(e, "video")}
-                  className="hidden"
-                  accept="video/mp4,video/webm,video/x-matroska"
-                />
-                {!uploadedVideo ? (
-                  <label
-                    htmlFor="video-upload"
-                    className="block cursor-pointer text-center py-6"
-                  >
-                    <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-sm font-medium text-gray-700 mb-1">Click to Upload Ads Video</p>
-                    <p className="text-xs text-gray-500 mb-1">Maximum 5 MB</p>
-                    <p className="text-xs text-gray-500">Supports: MP4, WEBM, MKV</p>
-                  </label>
-                ) : (
-                  <div className="space-y-3">
-                    {videoPreviewUrl && (
-                      <video
-                        src={videoPreviewUrl}
-                        controls
-                        className="w-full max-h-64 rounded-lg border border-gray-200 bg-black"
-                      />
-                    )}
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm text-gray-700">{uploadedVideo.name}</p>
-                        <p className="text-xs text-gray-500">{(uploadedVideo.size / (1024 * 1024)).toFixed(2)} MB</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setUploadedVideo(null)}
-                        className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 hover:bg-gray-50"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => videoInputRef.current?.click()}
-                      className="w-full py-2 text-sm font-medium text-[#FF0000] border border-[#FF0000]/30 rounded-lg hover:bg-red-50"
-                    >
-                      Replace video
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Video description
-                </label>
-                <textarea
-                  value={formData.videoDescription}
-                  onChange={(e) => handleInputChange("videoDescription", e.target.value)}
-                  placeholder="Enter video description"
-                  maxLength={100}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF0000] resize-none"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-        )}
       </div>
 
       {/* Bottom Buttons — sit above bottom nav; hidden while keyboard is open */}
@@ -562,11 +459,9 @@ export default function NewAdvertisementPage() {
                   endDate: "",
                   title: "",
                   description: "",
-                  fileDescription: "",
-                  videoDescription: ""
+                  fileDescription: ""
                 })
                 setUploadedFile(null)
-                setUploadedVideo(null)
               }}
               variant="outline"
               className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-lg border-0"

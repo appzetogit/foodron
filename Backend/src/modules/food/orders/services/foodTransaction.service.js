@@ -606,6 +606,9 @@ export async function settleRestaurantSharesForWithdrawal(
     const { FoodRestaurantWithdrawal } = await import(
         '../../restaurant/models/foodRestaurantWithdrawal.model.js'
     );
+    const { consumeOutstandingAdCharges } = await import(
+        '../../admin/services/advertisementBilling.service.js'
+    );
 
     const withdrawalOid =
         meta.withdrawalId && mongoose.Types.ObjectId.isValid(String(meta.withdrawalId))
@@ -677,13 +680,25 @@ export async function settleRestaurantSharesForWithdrawal(
             }
             openOrderShare = Math.round(openOrderShare * 100) / 100;
             const coverable = Math.round((openOrderShare + referralBal) * 100) / 100;
-            if (coverable + 0.009 < target) {
+            // Outstanding advertisement charges are paid out of the same pool: they
+            // consume order share first (like a withdrawal) so the restaurant is not
+            // charged twice. Positive charges are consumed only while they still fit
+            // after `target`; refund/cancel credits (negative) are always applied and
+            // lower the amount of order share that has to be consumed.
+            const adSettled = await consumeOutstandingAdCharges(
+                rid,
+                Math.round((coverable - target) * 100) / 100,
+                { session, withdrawalId: withdrawalOid }
+            );
+            const adTotal = adSettled.total;
+
+            if (coverable + 0.009 < target + adTotal) {
                 throw new Error(
-                    `Insufficient unsettled earnings to cover withdrawal. Available ₹${coverable}, required ₹${target}`
+                    `Insufficient unsettled earnings to cover withdrawal. Available ₹${Math.round((coverable - adTotal) * 100) / 100}, required ₹${target}`
                 );
             }
 
-            let remaining = target;
+            let remaining = Math.round((target + adTotal) * 100) / 100;
             const now = new Date();
             const settledIds = [];
             let settledOrderShare = 0;
@@ -781,6 +796,10 @@ export async function settleRestaurantSharesForWithdrawal(
                 remaining = Math.round((remaining - consume) * 100) / 100;
             }
 
+            // Split the ad portion between order share (consumed first) and referral.
+            const adFromOrder = Math.min(settledOrderShare, adTotal);
+            const adFromReferral = Math.round((adTotal - adFromOrder) * 100) / 100;
+
             let referralDebited = 0;
             if (remaining > 0) {
                 const liveReferral = Math.max(0, Number(wallet?.referralEarnings || 0));
@@ -826,7 +845,7 @@ export async function settleRestaurantSharesForWithdrawal(
                                             {
                                                 $add: [
                                                     { $ifNull: ['$totalSettled', 0] },
-                                                    referralDebited,
+                                                    Math.max(0, referralDebited - adFromReferral),
                                                 ],
                                             },
                                             2,
@@ -905,6 +924,8 @@ export async function settleRestaurantSharesForWithdrawal(
 
             // Order-share portion: totalSettled + audit history only.
             // Do not debit wallet.balance — order earnings live in food_transactions.
+            const payoutOrderShare =
+                Math.round(Math.max(0, settledOrderShare - adFromOrder) * 100) / 100;
             if (settledOrderShare > 0) {
                 await FoodRestaurantWallet.findOneAndUpdate(
                     { restaurantId: rid },
@@ -916,7 +937,7 @@ export async function settleRestaurantSharesForWithdrawal(
                                         {
                                             $add: [
                                                 { $ifNull: ['$totalSettled', 0] },
-                                                settledOrderShare,
+                                                payoutOrderShare,
                                             ],
                                         },
                                         2,
@@ -942,6 +963,7 @@ export async function settleRestaurantSharesForWithdrawal(
                                                 metadata: {
                                                     source: 'restaurant_withdrawal_order_share',
                                                     settledOrderShare,
+                                                    adChargesConsumed: adTotal,
                                                     balanceUnaffected: true,
                                                     ledger: 'food_transactions',
                                                     settledTransactionIds: settledIds.map(String),
@@ -981,6 +1003,7 @@ export async function settleRestaurantSharesForWithdrawal(
                 settledOrderShare,
                 settledCount: settledIds.length,
                 referralDebited,
+                adChargesSettled: adTotal,
                 settledTransactionIds: settledIds,
             };
         });

@@ -1,6 +1,8 @@
 import { sendResponse } from '../../../../utils/response.js';
 import * as orderService from '../services/order.service.js';
 import * as foodOrderPaymentService from '../services/foodOrderPayment.service.js';
+import { FoodTransaction } from '../models/foodTransaction.model.js';
+import { buildRestaurantEarningBreakdown } from '../utils/restaurantEarningBreakdown.util.js';
 import {
     validateCalculateOrderDto,
     validateCreateOrderDto,
@@ -283,8 +285,20 @@ export async function getOrderByIdRestaurantController(req, res, next) {
         const restaurantId = req.user?.userId;
         const orderId = req.params.orderId;
         const order = await orderService.getOrderById(orderId, { restaurantId });
+        // Earning breakdown comes from the settlement ledger so the restaurant sees the exact
+        // payout maths (commission, delivery fee, menu/coupon discount share) — not a client guess.
+        let earningBreakdown = null;
+        try {
+            const tx = await FoodTransaction.findOne({ orderId: order._id })
+                .select('amounts pricing')
+                .lean();
+            earningBreakdown = buildRestaurantEarningBreakdown(tx);
+        } catch {
+            earningBreakdown = null;
+        }
         return sendResponse(res, 200, 'Order retrieved', {
             order: toOrderDetailDto(order, { role: 'RESTAURANT' }),
+            earningBreakdown,
         });
     } catch (err) {
         next(err);

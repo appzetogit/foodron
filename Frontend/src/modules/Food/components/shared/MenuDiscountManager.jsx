@@ -45,6 +45,7 @@ const errorMessage = (error, fallback) => error?.response?.data?.message || erro
 export default function MenuDiscountManager({ role, api }) {
   const isAdmin = role === "admin"
   const [items, setItems] = useState([])
+  const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [stateFilter, setStateFilter] = useState("")
   const [search, setSearch] = useState("")
@@ -76,6 +77,7 @@ export default function MenuDiscountManager({ role, api }) {
       const res = await api.getMenuDiscounts(params)
       const data = res?.data?.data || {}
       setItems(Array.isArray(data.discounts) ? data.discounts : [])
+      setSummary(data.summary || null)
       setTotalPages(data.totalPages || 1)
     } catch (error) {
       toast.error(errorMessage(error, "Failed to load menu discounts"))
@@ -251,6 +253,35 @@ export default function MenuDiscountManager({ role, api }) {
         </button>
       </div>
 
+      {summary && (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Orders with discount</p>
+            <p className="mt-1 text-xl font-bold text-slate-900">{summary.orders}</p>
+            <p className="text-xs text-slate-500">Delivered orders only</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Total discount given</p>
+            <p className="mt-1 text-xl font-bold text-red-600">{rupee(summary.discountGiven)}</p>
+            <p className="text-xs text-slate-500">On {rupee(summary.orderValue)} of food value</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+              {isAdmin ? "Borne by admin earning" : "Funded by admin"}
+            </p>
+            <p className="mt-1 text-xl font-bold text-amber-600">{rupee(summary.adminBorne)}</p>
+            <p className="text-xs text-slate-500">{isAdmin ? "Deducted from admin earning" : "Not deducted from you"}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+              {isAdmin ? "Borne by restaurants" : "Deducted from your earning"}
+            </p>
+            <p className="mt-1 text-xl font-bold text-slate-900">{rupee(summary.restaurantBorne)}</p>
+            <p className="text-xs text-slate-500">{isAdmin ? "Deducted from restaurant earning" : "Your share of the discount"}</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         {STATE_TABS.map((tab) => (
           <button
@@ -289,6 +320,7 @@ export default function MenuDiscountManager({ role, api }) {
               <th className="px-4 py-3">Discount</th>
               <th className="px-4 py-3">Period</th>
               <th className="px-4 py-3">Who bears it</th>
+              <th className="px-4 py-3">Cost so far</th>
               <th className="px-4 py-3">Set by</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Actions</th>
@@ -297,13 +329,13 @@ export default function MenuDiscountManager({ role, api }) {
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={isAdmin ? 7 : 6} className="px-4 py-10 text-center text-slate-500">
+                <td colSpan={isAdmin ? 8 : 7} className="px-4 py-10 text-center text-slate-500">
                   <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={isAdmin ? 7 : 6} className="px-4 py-10 text-center text-slate-500">
+                <td colSpan={isAdmin ? 8 : 7} className="px-4 py-10 text-center text-slate-500">
                   No menu discounts found
                 </td>
               </tr>
@@ -323,6 +355,18 @@ export default function MenuDiscountManager({ role, api }) {
                   </td>
                   <td className="px-4 py-3 text-xs text-slate-600">
                     Admin {item.adminBearPercentage}% · Restaurant {item.restaurantBearPercentage}%
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-600">
+                    {item.usage?.orders > 0 ? (
+                      <>
+                        <p className="font-semibold text-slate-900">{rupee(item.usage.discountGiven)} · {item.usage.orders} order{item.usage.orders === 1 ? "" : "s"}</p>
+                        <p>
+                          Admin {rupee(item.usage.adminBorne)} · Restaurant {rupee(item.usage.restaurantBorne)}
+                        </p>
+                      </>
+                    ) : (
+                      <span className="text-slate-400">No orders yet</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 capitalize text-slate-600">{item.createdByRole}</td>
                   <td className="px-4 py-3">

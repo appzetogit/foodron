@@ -9,6 +9,15 @@ import EditAdvertisementDialog from "./EditAdvertisementDialog"
 import { adminAPI } from "@food/api"
 import { toast } from "sonner"
 
+const AD_STATUS_BADGE = {
+  Approved: "bg-green-100 text-green-700",
+  Running: "bg-green-100 text-green-700",
+  Pending: "bg-amber-100 text-amber-700",
+  Rejected: "bg-red-100 text-red-700",
+  Paused: "bg-slate-200 text-slate-700",
+  Expired: "bg-orange-100 text-orange-700",
+}
+
 export default function AdsList() {
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState("")
@@ -33,6 +42,7 @@ export default function AdsList() {
     restaurantInfo: true,
     adsType: true,
     duration: true,
+    payment: true,
     status: true,
     priority: true,
     actions: true,
@@ -63,6 +73,7 @@ export default function AdsList() {
     restaurantInfo: "Restaurant Info",
     adsType: "Ads Type",
     duration: "Duration",
+    payment: "Ad Payment",
     status: "Status",
     priority: "Priority",
     actions: "Actions",
@@ -173,6 +184,7 @@ export default function AdsList() {
       restaurantInfo: true,
       adsType: true,
       duration: true,
+      payment: true,
       status: true,
       priority: true,
       actions: true,
@@ -228,7 +240,8 @@ export default function AdsList() {
           >
             <option value="all">All Ads</option>
             <option value="Restaurant Promotion">Restaurant Promotion</option>
-            <option value="Video promotion">Video promotion</option>
+            <option value="Image Promotion">Image Promotion</option>
+            <option value="Banner Promotion">Banner Promotion</option>
           </select>
 
           <div className="relative flex-1 sm:flex-initial min-w-[250px]">
@@ -308,6 +321,7 @@ export default function AdsList() {
                 {visibleColumns.restaurantInfo && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Restaurant Info</th>}
                 {visibleColumns.adsType && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Ads Type</th>}
                 {visibleColumns.duration && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Duration</th>}
+                {visibleColumns.payment && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Ad Payment</th>}
                 {visibleColumns.status && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Status</th>}
                 {visibleColumns.priority && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Priority</th>}
                 {visibleColumns.actions && <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">Action</th>}
@@ -370,9 +384,25 @@ export default function AdsList() {
                         <span className="text-sm text-slate-700">{ad.duration}</span>
                       </td>
                     )}
+                    {visibleColumns.payment && (
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {ad.billable && Number(ad.adCommissionPercentage) > 0 ? (
+                          <div className="text-xs leading-5">
+                            <p className="font-semibold text-slate-800">{Number(ad.adCommissionPercentage)}% of daily earning</p>
+                            <p className="text-slate-500">
+                              Charged ₹{Number(ad.chargedTotal || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {" • "}{ad.chargedDays || 0} day(s)
+                            </p>
+                            <p className="text-slate-400">{ad.paymentStatus}</p>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-500">{ad.paymentStatus || "Free"}</span>
+                        )}
+                      </td>
+                    )}
                     {visibleColumns.status && (
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${AD_STATUS_BADGE[ad.status] || "bg-blue-100 text-blue-700"}`}>
                           {ad.status}
                         </span>
                       </td>
@@ -574,24 +604,10 @@ export default function AdsList() {
                 </div>
               )}
 
-              {selectedAd.videoDescription && (
-                <div className="mt-4">
-                  <p className="text-sm font-semibold text-slate-700 mb-1">Video Description</p>
-                  <p className="text-sm text-slate-900 bg-slate-50 p-3 rounded-lg border border-slate-100">{selectedAd.videoDescription}</p>
-                </div>
-              )}
-
-              {(selectedAd.imageUrl || selectedAd.image || selectedAd.profileImage || selectedAd.videoUrl || selectedAd.video || selectedAd.coverImage) && (
+              {(selectedAd.imageUrl || selectedAd.image || selectedAd.profileImage) && (
                 <div className="pt-4 border-t border-slate-100 mt-4">
                   <p className="text-sm font-semibold text-slate-700 mb-2">Banner / Media</p>
                   <div className="rounded-lg overflow-hidden bg-slate-50 border border-slate-200 flex items-center justify-center p-2">
-                    {selectedAd.adsType === "Video Promotion" || selectedAd.videoUrl || selectedAd.video || selectedAd.coverImage ? (
-                      <video 
-                        src={selectedAd.videoUrl || selectedAd.video || selectedAd.coverImage} 
-                        controls 
-                        className="max-h-[200px] w-auto rounded"
-                      />
-                    ) : (
                       <img 
                         src={selectedAd.imageUrl || selectedAd.image || selectedAd.profileImage} 
                         alt="Advertisement Banner" 
@@ -600,7 +616,6 @@ export default function AdsList() {
                           e.target.style.display = 'none';
                         }}
                       />
-                    )}
                   </div>
                 </div>
               )}

@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner"
 import BottomNavOrders from "@food/components/restaurant/BottomNavOrders"
 import { restaurantAPI } from "@food/api"
+import AdChargesLedger from "@food/components/restaurant/AdChargesLedger"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
@@ -27,6 +28,37 @@ function getApiErrorMessage(error, fallback = "Something went wrong") {
     error?.response?.data?.message ||
     error?.message ||
     fallback
+  )
+}
+
+/** Deduction components of one order's payout, from the ledger breakdown the server sends. */
+function getOrderDeductions(order) {
+  const b = order?.breakdown || {}
+  return {
+    commission: Number(b.commission ?? order?.commission) || 0,
+    discount: Number(b.restaurantDiscountShare) || 0,
+    menu: Number(b.menuDiscountRestaurantShare) || 0,
+    coupon: Number(b.couponDiscountRestaurantShare) || 0,
+    delivery: Number(b.restaurantDeliveryFee) || 0,
+    adminFunded: Number(b.adminDiscountShare) || 0,
+  }
+}
+const fmtInr = (n) =>
+  `₹${(Number(n) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+function OrderDeductionLine({ order }) {
+  const d = getOrderDeductions(order)
+  if (!(d.discount > 0 || d.delivery > 0 || d.adminFunded > 0)) return null
+  return (
+    <p className="mt-1 text-[11px] text-red-600">
+      Commission {fmtInr(d.commission)}
+      {d.menu > 0 ? ` · Menu discount (your share) ${fmtInr(d.menu)}` : ""}
+      {d.coupon > 0 ? ` · Coupon (your share) ${fmtInr(d.coupon)}` : ""}
+      {d.delivery > 0 ? ` · Delivery fee ${fmtInr(d.delivery)}` : ""}
+      {d.adminFunded > 0 && (
+        <span className="text-gray-500"> · Admin-funded discount {fmtInr(d.adminFunded)} (not deducted)</span>
+      )}
+    </p>
   )
 }
 
@@ -64,6 +96,10 @@ export default function HubFinance() {
       ? Number(rawMaxWithdrawal)
       : null
   const availableBalance = Number(financeData?.earnings?.availableBalance || 0)
+  const adDeductions = Number(financeData?.earnings?.adDeductions || 0)
+  const netBalance = Number(financeData?.earnings?.netBalance ?? availableBalance)
+  const fmtMoney = (n) =>
+    `${n < 0 ? "-" : ""}₹${Math.abs(Number(n) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const maxAllowedWithdrawal =
     maxWithdrawalLimit != null
       ? Math.min(availableBalance, maxWithdrawalLimit)
@@ -257,7 +293,9 @@ export default function HubFinance() {
         sum + (order.commission || Math.max(0, Number(order.totalAmount || 0) - Number(order.payout || order.restaurantEarning || 0))),
       0,
     )
-    return { earnings, gross, commission, count: invoiceOrders.length }
+    const discountShare = invoiceOrders.reduce((sum, o) => sum + getOrderDeductions(o).discount, 0)
+    const deliveryFee = invoiceOrders.reduce((sum, o) => sum + getOrderDeductions(o).delivery, 0)
+    return { earnings, gross, commission, discountShare, deliveryFee, count: invoiceOrders.length }
   }, [invoiceOrders])
 
   const currentCycleCommission = useMemo(() => {
@@ -472,6 +510,8 @@ export default function HubFinance() {
         payout,
         restaurantEarning: payout,
         commission,
+        discountShare: getOrderDeductions(order).discount,
+        restaurantDeliveryFee: getOrderDeductions(order).delivery,
         paymentMethod: order.paymentMethod || "N/A",
         orderStatus: order.orderStatus || order.status || "N/A",
       }
@@ -480,6 +520,8 @@ export default function HubFinance() {
     const totalEarnings = allOrders.reduce((sum, o) => sum + (Number(o.payout) || 0), 0)
     const totalRestaurantGross = allOrders.reduce((sum, o) => sum + (Number(o.restaurantGross) || 0), 0)
     const totalCommission = allOrders.reduce((sum, o) => sum + (Number(o.commission) || 0), 0)
+    const totalDiscountShare = allOrders.reduce((sum, o) => sum + (Number(o.discountShare) || 0), 0)
+    const totalDeliveryFee = allOrders.reduce((sum, o) => sum + (Number(o.restaurantDeliveryFee) || 0), 0)
     const totalCustomerPaid = allOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0)
 
     return {
@@ -491,6 +533,8 @@ export default function HubFinance() {
         totalEarnings,
         totalRestaurantGross,
         totalCommission,
+        totalDiscountShare,
+        totalDeliveryFee,
         totalCustomerPaid,
       },
       pastCycles: pastCyclesData,
@@ -621,6 +665,14 @@ export default function HubFinance() {
               <p class="label">Commission</p>
               <p class="value">${fmt(summary.totalCommission)}</p>
             </div>
+            <div class="summary-card">
+              <p class="label">Discounts (your share)</p>
+              <p class="value">${fmt(summary.totalDiscountShare)}</p>
+            </div>
+            <div class="summary-card">
+              <p class="label">Delivery fee (paid by you)</p>
+              <p class="value">${fmt(summary.totalDeliveryFee)}</p>
+            </div>
           </div>
         </div>
 
@@ -630,15 +682,17 @@ export default function HubFinance() {
             <table class="orders-table">
               <thead>
                 <tr>
-                  <th style="width: 12%;">Order ID</th>
-                  <th style="width: 10%;">Date</th>
-                  <th style="width: 22%;">Items</th>
-                  <th style="width: 6%;">Qty</th>
-                  <th style="width: 11%;">Restaurant Gross</th>
-                  <th style="width: 10%;">Commission</th>
-                  <th style="width: 11%;">Earning</th>
-                  <th style="width: 9%;">Payment</th>
-                  <th style="width: 9%;">Status</th>
+                  <th style="width: 11%;">Order ID</th>
+                  <th style="width: 9%;">Date</th>
+                  <th style="width: 16%;">Items</th>
+                  <th style="width: 5%;">Qty</th>
+                  <th style="width: 10%;">Restaurant Gross</th>
+                  <th style="width: 9%;">Commission</th>
+                  <th style="width: 9%;">Discount (your share)</th>
+                  <th style="width: 8%;">Delivery fee</th>
+                  <th style="width: 10%;">Earning</th>
+                  <th style="width: 7%;">Payment</th>
+                  <th style="width: 6%;">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -660,6 +714,8 @@ export default function HubFinance() {
                       <td>${itemQuantities}</td>
                       <td>${fmt(orderValue)}</td>
                       <td>${fmt(commission)}</td>
+                      <td>${fmt(order.discountShare)}</td>
+                      <td>${fmt(order.restaurantDeliveryFee)}</td>
                       <td>${fmt(earning)}</td>
                       <td>${order.paymentMethod || 'N/A'}</td>
                       <td>${order.orderStatus || 'N/A'}</td>
@@ -672,6 +728,8 @@ export default function HubFinance() {
                   <td colspan="4" style="text-align: right;">Totals:</td>
                   <td>${fmt(summary.totalRestaurantGross)}</td>
                   <td>${fmt(summary.totalCommission)}</td>
+                  <td>${fmt(summary.totalDiscountShare)}</td>
+                  <td>${fmt(summary.totalDeliveryFee)}</td>
                   <td>${fmt(summary.totalEarnings)}</td>
                   <td colspan="2"></td>
                 </tr>
@@ -944,6 +1002,27 @@ export default function HubFinance() {
                       <p className="mb-2 text-4xl font-black md:text-5xl">
                         ₹{availableBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
+                      {(adDeductions !== 0 || netBalance < 0) && (
+                        <div className="mb-3 rounded-xl bg-white/10 p-3 text-xs text-gray-200">
+                          <div className="flex justify-between">
+                            <span>Earnings + referrals (unsettled)</span>
+                            <span>{fmtMoney((Number(financeData?.earnings?.pendingPayout) || 0) + (Number(financeData?.earnings?.referralEarnings) || 0))}</span>
+                          </div>
+                          <div className={`flex justify-between ${adDeductions < 0 ? "text-green-300" : "text-amber-300"}`}>
+                            <span>{adDeductions < 0 ? "Ad charge refunds (credit)" : "Advertisement charges"}</span>
+                            <span>{adDeductions < 0 ? "+ " : "− "}{fmtMoney(Math.abs(adDeductions))}</span>
+                          </div>
+                          <div className={`mt-1 flex justify-between border-t border-white/20 pt-1 font-bold ${netBalance < 0 ? "text-red-300" : "text-white"}`}>
+                            <span>Wallet balance</span>
+                            <span>{fmtMoney(netBalance)}</span>
+                          </div>
+                          {netBalance < 0 && (
+                            <p className="mt-1 text-[11px] text-red-300">
+                              Ad charges are more than your earnings. Your upcoming order earnings will clear this automatically.
+                            </p>
+                          )}
+                        </div>
+                      )}
                       <p className="mb-1 text-xs font-medium text-gray-400 opacity-80">
                         Limit: Min ₹{minWithdrawalLimit.toLocaleString('en-IN')}
                         {maxWithdrawalLimit != null ? ` • Max ₹${maxWithdrawalLimit.toLocaleString('en-IN')}` : ''}
@@ -987,6 +1066,11 @@ export default function HubFinance() {
                     ₹{(financeData?.currentCycle?.totalEarnings || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                   <p className="mt-1 text-xs text-gray-500">{financeData?.currentCycle?.totalOrders || 0} orders</p>
+                  {Number(financeData?.currentCycle?.adCharges) > 0 && (
+                    <p className="mt-1 text-xs font-medium text-amber-700">
+                      Ad charges − {fmtMoney(financeData.currentCycle.adCharges)} • Net {fmtMoney(financeData.currentCycle.netEarnings)}
+                    </p>
+                  )}
                 </div>
                 <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                   <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Lifetime earnings</p>
@@ -1014,6 +1098,17 @@ export default function HubFinance() {
                   <p className="mt-1 text-xs text-gray-500">Current cycle platform commission</p>
                 </div>
                 <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Ad charges</p>
+                  <p className={`text-2xl font-bold ${adDeductions > 0 ? "text-amber-700" : "text-gray-900"}`}>
+                    {fmtMoney(adDeductions)}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {Number(financeData?.earnings?.adCommissionPercentage) > 0
+                      ? `${financeData.earnings.adCommissionPercentage}% of daily earning • lifetime ${fmtMoney(financeData?.earnings?.adLifetimeCharged || 0)}`
+                      : "Deducted from earnings • ads free right now"}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                   <div className="flex items-center justify-between h-full">
                     <div>
                       <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Referral balance</p>
@@ -1038,6 +1133,10 @@ export default function HubFinance() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="mb-6">
+              <AdChargesLedger />
             </div>
 
             {/* Withdrawal requests + past cycles on desktop */}
@@ -1324,6 +1423,7 @@ export default function HubFinance() {
                                     Number(order.payout ?? order.restaurantEarning ?? 0) + Number(order.commission ?? 0)
                                   ).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </p>
+                                <OrderDeductionLine order={order} />
                               </div>
                               <div className="text-right ml-4 shrink-0">
                                 <p className="text-sm font-bold text-gray-900">
@@ -1356,6 +1456,7 @@ export default function HubFinance() {
                                 <p className="text-xs text-gray-600">
                                   {order.foodNames || (order.items && order.items.map(item => item.name).join(', ')) || 'N/A'}
                                 </p>
+                                <OrderDeductionLine order={order} />
                               </div>
                               <div className="text-right ml-4">
                                 <p className="text-sm font-bold text-gray-900">
@@ -1408,6 +1509,14 @@ export default function HubFinance() {
                   <p className="text-xs text-gray-600">Commission</p>
                   <p className="text-base font-semibold text-gray-900">₹{invoiceSummary.commission.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
+                <div className="rounded-md bg-gray-50 p-3">
+                  <p className="text-xs text-gray-600">Discounts (your share)</p>
+                  <p className="text-base font-semibold text-red-600">{fmtInr(invoiceSummary.discountShare)}</p>
+                </div>
+                <div className="rounded-md bg-gray-50 p-3">
+                  <p className="text-xs text-gray-600">Delivery fee (paid by you)</p>
+                  <p className="text-base font-semibold text-gray-900">{fmtInr(invoiceSummary.deliveryFee)}</p>
+                </div>
               </div>
             </div>
 
@@ -1427,6 +1536,7 @@ export default function HubFinance() {
                           <p className="text-xs text-gray-600 mt-0.5">
                             {order.paymentMethod || "N/A"} | {order.orderStatus || "N/A"}
                           </p>
+                          <OrderDeductionLine order={order} />
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-semibold text-gray-900">

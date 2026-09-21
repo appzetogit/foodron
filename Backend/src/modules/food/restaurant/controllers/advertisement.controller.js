@@ -6,6 +6,7 @@ import {
     deleteRestaurantAdvertisement,
     pauseRestaurantAdvertisement
 } from '../services/advertisement.service.js';
+import { getRestaurantAdBilling } from '../../admin/services/advertisementBilling.service.js';
 import { sendResponse } from '../../../../utils/response.js';
 import { invalidateCache } from '../../../../middleware/cache.js';
 
@@ -73,6 +74,16 @@ export const pauseRestaurantAdvertisementController = async (req, res, next) => 
         const ad = await pauseRestaurantAdvertisement(restaurantId, req.params.id);
         invalidateCache('landing_advertisements*');
         return sendResponse(res, 200, 'Advertisement status updated', ad);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getRestaurantAdvertisementBillingController = async (req, res, next) => {
+    try {
+        const restaurantId = req.user?.userId;
+        const data = await getRestaurantAdBilling(restaurantId, req.query || {});
+        return sendResponse(res, 200, 'Advertisement billing fetched successfully', data);
     } catch (error) {
         next(error);
     }
