@@ -442,6 +442,29 @@ export default function TransactionReport() {
               </div>
             </div>
 
+            {/* Menu discount funding */}
+            <div className="rounded-lg shadow-sm border border-slate-200 p-3" style={{ backgroundColor: '#f1f5f9' }}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900">Menu Discount Given</p>
+                  <div className="mt-1.5 space-y-0.5">
+                    <p className="text-[11px] text-slate-600">
+                      Deducted from admin earning:{' '}
+                      <span className="font-semibold text-amber-700">{formatFullCurrency(Number(summary.menuDiscountAdminBorne || 0))}</span>
+                    </p>
+                    <p className="text-[11px] text-slate-600">
+                      Deducted from restaurant earning:{' '}
+                      <span className="font-semibold text-slate-800">{formatFullCurrency(Number(summary.menuDiscountRestaurantBorne || 0))}</span>
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Total</p>
+                  <p className="text-base font-bold text-red-600">{formatCurrency(Number(summary.menuDiscountTotal || 0))}</p>
+                </div>
+              </div>
+            </div>
+
             {/* Deliveryman Earning */}
             <div className="rounded-lg shadow-sm border border-slate-200 p-3" style={{ backgroundColor: '#f1f5f9' }}>
               <div className="flex items-center justify-between gap-3">
@@ -549,28 +572,33 @@ export default function TransactionReport() {
 
           {/* Table */}
           <div className="overflow-x-auto scrollbar-hide">
-            <table className="w-full" style={{ tableLayout: 'fixed', width: '100%' }}>
+            <table className="w-full" style={{ tableLayout: 'fixed', width: '100%', minWidth: '1700px' }}>
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '3%' }}>SI</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '7%' }}>Order Id</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '10%' }}>Restaurant</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '10%' }}>Customer Name</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '10%' }}>Total Item Amount</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Coupon Discount</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '7%' }}>Vat/Tax</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Delivery Charge</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '7%' }}>Platform Fee</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Packaging Fee</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Order Amount</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Order Status</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Payment Status</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '2.5%' }}>SI</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '6%' }}>Order Id</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Restaurant</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '7%' }}>Customer Name</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '6%' }}>Total Item Amount</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '6.5%' }}>Menu Discount</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '5.5%' }}>Admin Bears</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '5.5%' }}>Restaurant Bears</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '5%' }}>Coupon Discount</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '4.5%' }}>Vat/Tax</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '5%' }}>Delivery Charge</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '4.5%' }}>Platform Fee</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '4.5%' }}>Packaging Fee</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '6%' }}>Order Amount</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '6%' }}>Restaurant Earning</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '6%' }}>Admin Earning</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '6%' }}>Order Status</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '6%' }}>Payment Status</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-100">
                 {filteredTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="px-6 py-20 text-center">
+                    <td colSpan={18} className="px-6 py-20 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
                         <p className="text-sm text-slate-500">No transactions match your search</p>
@@ -608,6 +636,22 @@ export default function TransactionReport() {
                           <span className="text-[10px] text-slate-700">{formatFullCurrency(transaction.totalItemAmount)}</span>
                         </td>
                         <td className="px-1.5 py-1">
+                          <span className="text-[10px] text-slate-700">
+                            {formatFullCurrency(transaction.menuDiscount || 0)}
+                            {Number(transaction.menuDiscountPercentage) > 0 && (
+                              <span className="block text-[8px] text-slate-400">
+                                {transaction.menuDiscountPercentage}% · by {transaction.menuDiscountSource || "—"}
+                              </span>
+                            )}
+                          </span>
+                        </td>
+                        <td className="px-1.5 py-1">
+                          <span className="text-[10px] text-amber-700">{formatFullCurrency(transaction.menuDiscountAdminShare || 0)}</span>
+                        </td>
+                        <td className="px-1.5 py-1">
+                          <span className="text-[10px] text-slate-700">{formatFullCurrency(transaction.menuDiscountRestaurantShare || 0)}</span>
+                        </td>
+                        <td className="px-1.5 py-1">
                           <span className="text-[10px] text-slate-700">{formatFullCurrency(transaction.couponDiscount)}</span>
                         </td>
                         <td className="px-1.5 py-1">
@@ -624,6 +668,12 @@ export default function TransactionReport() {
                         </td>
                         <td className="px-1.5 py-1">
                           <span className="text-[10px] font-medium text-slate-900">{formatFullCurrency(transaction.orderAmount)}</span>
+                        </td>
+                        <td className="px-1.5 py-1">
+                          <span className="text-[10px] font-medium text-green-700">{formatFullCurrency(transaction.restaurantEarning || 0)}</span>
+                        </td>
+                        <td className="px-1.5 py-1">
+                          <span className="text-[10px] font-medium text-slate-900">{formatFullCurrency(transaction.adminEarning || 0)}</span>
                         </td>
                         <td className="px-1.5 py-1">
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-semibold tracking-wide ${getOrderStatusBadgeClasses(orderStatusVal)}`}>

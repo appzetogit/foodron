@@ -6,7 +6,6 @@ import { adminAPI } from "@food/api"
 
 const ADS_TYPES = [
   "Restaurant Promotion",
-  "Video Promotion",
   "Image Promotion",
   "Banner Promotion",
 ]
@@ -14,6 +13,7 @@ const ADS_TYPES = [
 export default function NewAdvertisement() {
   const navigate = useNavigate()
   const [restaurants, setRestaurants] = useState([])
+  const [adPercentages, setAdPercentages] = useState({})
   const [loadingRestaurants, setLoadingRestaurants] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [formData, setFormData] = useState({
@@ -25,7 +25,6 @@ export default function NewAdvertisement() {
     priority: "2",
   })
   const [imageFile, setImageFile] = useState(null)
-  const [videoFile, setVideoFile] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -33,6 +32,15 @@ export default function NewAdvertisement() {
       try {
         setLoadingRestaurants(true)
         const response = await adminAPI.getRestaurants({ limit: 1000, status: "approved" })
+        adminAPI
+          .getRestaurantAdSettings({ limit: 500 })
+          .then((res) => {
+            const rows = Array.isArray(res?.data?.data) ? res.data.data : []
+            if (!cancelled) {
+              setAdPercentages(Object.fromEntries(rows.map((r) => [r.restaurantId, r.adCommissionPercentage])))
+            }
+          })
+          .catch(() => {})
         const data = response?.data?.data
         const raw = Array.isArray(data) ? data : (data?.restaurants || [])
         if (!cancelled) {
@@ -72,10 +80,6 @@ export default function NewAdvertisement() {
       toast.error("Validity is required")
       return
     }
-    if (formData.adsType === "Video Promotion" && !videoFile) {
-      toast.error("Video file is required")
-      return
-    }
     if (
       ["Image Promotion", "Banner Promotion", "Restaurant Promotion"].includes(formData.adsType) &&
       !imageFile
@@ -96,7 +100,6 @@ export default function NewAdvertisement() {
       payload.append("priority", formData.priority)
       payload.append("autoApprove", "true")
       if (imageFile) payload.append("image", imageFile)
-      if (videoFile) payload.append("video", videoFile)
 
       await adminAPI.createAdvertisement(payload)
       toast.success("Advertisement created")
@@ -145,6 +148,13 @@ export default function NewAdvertisement() {
                   </option>
                 ))}
               </select>
+              {formData.restaurantId && (
+                <p className="mt-1.5 text-xs text-slate-600">
+                  {Number(adPercentages[formData.restaurantId]) > 0
+                    ? `Ad billing: ${adPercentages[formData.restaurantId]}% of this restaurant's daily earning is credited to admin for every active day (deducted from their earnings).`
+                    : "No ad percentage set for this restaurant — this ad will be free. Set it in Advertisements → Ad Billing before approving."}
+                </p>
+              )}
             </div>
 
             <div>
@@ -230,27 +240,15 @@ export default function NewAdvertisement() {
               </div>
             </div>
 
-            {formData.adsType === "Video Promotion" ? (
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Video</label>
-                <input
-                  type="file"
-                  accept="video/*"
-                  onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
-                  className="w-full text-sm"
-                />
-              </div>
-            ) : (
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Image</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                  className="w-full text-sm"
-                />
-              </div>
-            )}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Image</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                className="w-full text-sm"
+              />
+            </div>
 
             <div className="flex gap-3 pt-2">
               <button

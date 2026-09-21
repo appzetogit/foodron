@@ -77,6 +77,8 @@ export const getPublicAdvertisementsController = async (req, res, next) => {
         const query = {
             status: 'Approved',
             isDeleted: false,
+            // Video Promotion is discontinued — never served to users.
+            adsType: { $ne: 'Video Promotion' },
             $and: [
                 { $or: [{ startDate: null }, { startDate: { $lte: now } }] },
                 { $or: [{ endDate: null }, { endDate: { $gte: now } }] }

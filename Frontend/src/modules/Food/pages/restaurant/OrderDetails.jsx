@@ -217,6 +217,7 @@ export default function OrderDetails({ orderId: propOrderId, isSidebar = false, 
               location: fullAddress,
               distance: order.deliveryDistance ? `${order.deliveryDistance} km` : ''
             },
+            earningBreakdown: response.data.data.earningBreakdown || null,
             items: order.items?.map(item => ({
               name: item.name,
               quantity: item.quantity,
@@ -755,16 +756,71 @@ export default function OrderDetails({ orderId: propOrderId, isSidebar = false, 
                 (Number(orderData.billing.quickRestaurantShare) || 0))
               )}</span>
             </div>
+            {orderData.earningBreakdown && (
+              <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">How your earning is calculated</p>
+                <div className="flex justify-between py-0.5">
+                  <span className="text-gray-600">Items + packaging</span>
+                  <span className="text-gray-900">{formatMoney(orderData.earningBreakdown.gross)}</span>
+                </div>
+                <div className="flex justify-between py-0.5 text-red-700">
+                  <span>Commission</span>
+                  <span>{formatDiscount(orderData.earningBreakdown.commission)}</span>
+                </div>
+                {Number(orderData.earningBreakdown.restaurantDeliveryFee) > 0 && (
+                  <div className="flex justify-between py-0.5 text-red-700">
+                    <span>Delivery fee (paid by you)</span>
+                    <span>{formatDiscount(orderData.earningBreakdown.restaurantDeliveryFee)}</span>
+                  </div>
+                )}
+                {Number(orderData.earningBreakdown.menuDiscountRestaurantShare) > 0 && (
+                  <div className="flex justify-between py-0.5 text-red-700">
+                    <span>
+                      Menu discount (your share
+                      {Number(orderData.earningBreakdown.menuDiscount) > 0
+                        ? ` of ${formatMoney(orderData.earningBreakdown.menuDiscount)}`
+                        : ""})
+                    </span>
+                    <span>{formatDiscount(orderData.earningBreakdown.menuDiscountRestaurantShare)}</span>
+                  </div>
+                )}
+                {Number(orderData.earningBreakdown.couponDiscountRestaurantShare) > 0 && (
+                  <div className="flex justify-between py-0.5 text-red-700">
+                    <span>Coupon discount (your share)</span>
+                    <span>{formatDiscount(orderData.earningBreakdown.couponDiscountRestaurantShare)}</span>
+                  </div>
+                )}
+                {Number(orderData.earningBreakdown.quickShare) > 0 && (
+                  <div className="flex justify-between py-0.5">
+                    <span className="text-gray-600">Quick order share</span>
+                    <span className="text-gray-900">+{formatMoney(orderData.earningBreakdown.quickShare)}</span>
+                  </div>
+                )}
+                {Number(orderData.earningBreakdown.adjustment) !== 0 && (
+                  <div className="flex justify-between py-0.5">
+                    <span className="text-gray-600">Refund / rounding adjustment</span>
+                    <span className="text-gray-900">{Number(orderData.earningBreakdown.adjustment) < 0 ? "-" : "+"}{formatMoney(Math.abs(orderData.earningBreakdown.adjustment))}</span>
+                  </div>
+                )}
+                {Number(orderData.earningBreakdown.adminDiscountShare) > 0 && (
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    {formatMoney(orderData.earningBreakdown.adminDiscountShare)} of the customer discount is funded by admin and is not deducted from you.
+                  </p>
+                )}
+              </div>
+            )}
             <div className="flex items-center justify-between pt-2 mt-2 border-t border-gray-100">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold text-green-700">Restaurant Earning</span>
               </div>
               <span className="text-sm font-bold text-green-700">{formatMoney(
-                Math.max(0, (Number(orderData.billing.itemSubtotal) || 0) + 
-                (Number(orderData.billing.packagingFee) || 0) + 
-                (Number(orderData.billing.quickRestaurantShare) || 0) - 
-                (Number(orderData.billing.restaurantCommission) || 0) -
-                (Number(orderData.billing.menuRestaurantShare) || 0))
+                orderData.earningBreakdown
+                  ? orderData.earningBreakdown.netEarning
+                  : Math.max(0, (Number(orderData.billing.itemSubtotal) || 0) +
+                    (Number(orderData.billing.packagingFee) || 0) +
+                    (Number(orderData.billing.quickRestaurantShare) || 0) -
+                    (Number(orderData.billing.restaurantCommission) || 0) -
+                    (Number(orderData.billing.menuRestaurantShare) || 0))
               )}</span>
             </div>
           </div>

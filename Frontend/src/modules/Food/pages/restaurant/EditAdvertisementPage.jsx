@@ -58,16 +58,13 @@ export default function EditAdvertisementPage() {
     endDate: "",
     title: "",
     description: "",
-    fileDescription: "",
-    videoDescription: ""
+    fileDescription: ""
   })
   const [uploadedFile, setUploadedFile] = useState(null)
-  const [uploadedVideo, setUploadedVideo] = useState(null)
   const categoryRef = useRef(null)
   const startDateRef = useRef(null)
   const endDateRef = useRef(null)
   const fileInputRef = useRef(null)
-  const videoInputRef = useRef(null)
   const [isPhotoPickerOpen, setIsPhotoPickerOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -89,13 +86,16 @@ export default function EditAdvertisementPage() {
         setAdData(data)
         const parsedDates = parseValidity(data)
         setFormData({
-          category: data.adsType || data.type || data.category || "Image Promotion",
+          // Video Promotion is discontinued: legacy video ads must be converted to an image type.
+          category:
+            (data.adsType || data.type || data.category) === "Video Promotion"
+              ? "Image Promotion"
+              : data.adsType || data.type || data.category || "Image Promotion",
           startDate: parsedDates.startDate,
           endDate: parsedDates.endDate,
           title: data.title || "",
           description: data.description || "",
-          fileDescription: data.fileDescription || "",
-          videoDescription: data.videoDescription || ""
+          fileDescription: data.fileDescription || ""
         })
       } catch (err) {
         if (!cancelled) {
@@ -131,39 +131,25 @@ export default function EditAdvertisementPage() {
   }, [])
 
   const categories = [
-    "Video Promotion",
     "Restaurant Promotion",
     "Image Promotion",
     "Banner Promotion"
   ]
 
-  const isVideoPromotion = formData.category === "Video Promotion"
   const requiresImage = ["Image Promotion", "Banner Promotion", "Restaurant Promotion"].includes(formData.category)
   const minStartDate = todayISO()
   const hasExistingImage = Boolean(adData?.imageUrl)
-  const hasExistingVideo = Boolean(adData?.videoUrl)
 
   const imagePreviewUrl = useMemo(() => {
     if (!uploadedFile) return null
     return URL.createObjectURL(uploadedFile)
   }, [uploadedFile])
 
-  const videoPreviewUrl = useMemo(() => {
-    if (!uploadedVideo) return null
-    return URL.createObjectURL(uploadedVideo)
-  }, [uploadedVideo])
-
   useEffect(() => {
     return () => {
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl)
     }
   }, [imagePreviewUrl])
-
-  useEffect(() => {
-    return () => {
-      if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl)
-    }
-  }, [videoPreviewUrl])
 
   const handleFileSelect = (file) => {
     if (file) {
@@ -192,16 +178,6 @@ export default function EditAdvertisementPage() {
     if (!file) return
     if (type === "file") {
       handleFileSelect(file)
-    } else if (type === "video") {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("Video size too large. Max 5MB allowed.")
-        return
-      }
-      setUploadedVideo(file)
-      setFormData(prev => ({
-        ...prev,
-        videoDescription: prev.videoDescription?.trim() ? prev.videoDescription : file.name
-      }))
     }
     e.target.value = ""
   }
@@ -239,10 +215,6 @@ export default function EditAdvertisementPage() {
       toast.error("End date must be on or after start date")
       return
     }
-    if (isVideoPromotion && !uploadedVideo && !hasExistingVideo) {
-      toast.error("Please upload a video for Video Promotion")
-      return
-    }
     if (requiresImage && !uploadedFile && !hasExistingImage) {
       toast.error("Please upload an image for this advertisement type")
       return
@@ -257,9 +229,7 @@ export default function EditAdvertisementPage() {
       payload.append("category", formData.category)
       payload.append("validity", `${formData.startDate} to ${formData.endDate}`)
       payload.append("fileDescription", formData.fileDescription || "")
-      payload.append("videoDescription", formData.videoDescription || "")
       if (uploadedFile) payload.append("image", uploadedFile)
-      if (uploadedVideo) payload.append("video", uploadedVideo)
 
       await restaurantAPI.updateAdvertisement(id, payload)
       toast.success("Advertisement updated and pending approval")
@@ -552,71 +522,6 @@ export default function EditAdvertisementPage() {
         </motion.div>
         )}
 
-        {isVideoPromotion && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.2 }}
-        >
-          <Card className="bg-white shadow-sm border border-gray-100">
-            <CardContent className="p-4 space-y-4">
-              <h2 className="text-base font-bold text-gray-900">
-                Upload Files <span className="text-red-500">*</span>
-              </h2>
-
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-                  <input
-                    ref={videoInputRef}
-                    type="file"
-                    id="video-upload"
-                    onChange={(e) => handleFileUpload(e, "video")}
-                    className="hidden"
-                    accept="video/mp4,video/webm,video/x-matroska"
-                  />
-                  <label
-                    htmlFor="video-upload"
-                    className="block cursor-pointer text-center"
-                  >
-                    {uploadedVideo && videoPreviewUrl ? (
-                      <div className="space-y-3">
-                        <video
-                          src={videoPreviewUrl}
-                          controls
-                          className="w-full max-h-64 rounded-lg border border-gray-200 bg-black"
-                        />
-                        <div className="flex items-center justify-between gap-2">
-                          <div>
-                            <p className="text-sm text-gray-700">{uploadedVideo.name}</p>
-                            <p className="text-xs text-gray-500">{(uploadedVideo.size / (1024 * 1024)).toFixed(2)} MB</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setUploadedVideo(null)}
-                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 hover:bg-gray-50"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ) : adData?.videoUrl ? (
-                      <div>
-                        <video src={adData.videoUrl} controls className="w-full rounded-lg max-h-64 bg-black mb-2" />
-                        <p className="text-xs text-gray-500">Current video</p>
-                      </div>
-                    ) : (
-                      <>
-                        <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-sm font-medium text-gray-700 mb-1">Click to Upload Ads Video</p>
-                        <p className="text-xs text-gray-500 mb-1">Maximum 5 MB</p>
-                        <p className="text-xs text-gray-500">Supports: MP4, WEBM, MKV</p>
-                      </>
-                    )}
-                  </label>
-                </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-        )}
       </div>
 
       {/* Bottom Buttons */}
@@ -631,11 +536,9 @@ export default function EditAdvertisementPage() {
                 endDate: "",
                 title: "",
                 description: "",
-                fileDescription: "",
-                videoDescription: ""
+                fileDescription: ""
               })
               setUploadedFile(null)
-              setUploadedVideo(null)
             }}
             disabled={!adData}
             variant="outline"

@@ -398,6 +398,17 @@ export default function AdminHome() {
             canAccess={canAccessPath}
           />
           <StatCard
+            title="Ad Revenue"
+            value={formatCurrency(dashboardData?.adRevenue?.total || 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            helper={`${dashboardData?.adRevenue?.days || 0} ad-day(s) billed • separate from Platform Total`}
+            icon={<IndianRupee className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+            cardBg="bg-[#FFFBEB] border-amber-200/60 hover:border-amber-300/80"
+            iconBg="bg-amber-100/80"
+            iconColor="text-amber-700"
+            to="/admin/food/advertisement/billing"
+            canAccess={canAccessPath}
+          />
+          <StatCard
             title="Total restaurants"
             value={totalRestaurants.toLocaleString("en-IN")}
             helper="Approved restaurants"

@@ -1,12 +1,25 @@
 import mongoose from 'mongoose';
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone.js';
+import utc from 'dayjs/plugin/utc.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { FoodAdvertisement, ADS_TYPE_OPTIONS } from '../../admin/models/advertisement.model.js';
+import {
+    settleAdvertisementCharges,
+    getAdChargeTotalsByAd,
+    getAdCampaignDays,
+    istToday,
+    isBillableAdType
+} from '../../admin/services/advertisementBilling.service.js';
 import { FoodRestaurant } from '../models/restaurant.model.js';
 import {
     uploadImageBufferDetailed,
-    uploadBufferDetailed,
     destroyAsset
 } from '../../../../services/upload.service.js';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+const IST = 'Asia/Kolkata';
 
 function generateAdsId() {
     const suffix = Date.now().toString(36).toUpperCase().slice(-6);
@@ -18,7 +31,26 @@ function parseValidity(validity, { allowPastStart = false } = {}) {
     const raw = String(validity || '').trim();
     if (!raw) return { validity: '', startDate: null, endDate: null };
 
-    // Supports "YYYY-MM-DD" or "YYYY-MM-DD to YYYY-MM-DD"
+    // Preferred path: "YYYY-MM-DD" or "YYYY-MM-DD to YYYY-MM-DD" as IST calendar days,
+    // so display/expiry/public visibility line up exactly with the daily billing days.
+    const days = raw.match(/\d{4}-\d{2}-\d{2}/g);
+    if (days && days.length) {
+        const first = days[0];
+        const last = days[1] || days[0];
+        if (last < first) {
+            throw new ValidationError('Validity end date must be on or after start date');
+        }
+        if (!allowPastStart && first < istToday()) {
+            throw new ValidationError('Start date cannot be in the past');
+        }
+        return {
+            validity: raw,
+            startDate: dayjs.tz(first, IST).startOf('day').toDate(),
+            endDate: dayjs.tz(last, IST).endOf('day').toDate()
+        };
+    }
+
+    // Legacy free-form input
     const parts = raw.split(/\s+to\s+|\s+-\s+/i).map((p) => p.trim()).filter(Boolean);
     const start = parts[0] ? new Date(parts[0]) : null;
     const end = parts[1] ? new Date(parts[1]) : start ? new Date(parts[0]) : null;
@@ -72,7 +104,55 @@ function formatDate(value) {
     }
 }
 
-function toRestaurantView(ad) {
+/**
+ * Billing block shown on every ad row. `restaurantPct` is the admin-set rate for the
+ * restaurant (used while the ad is not live yet); once live the snapshotted rate wins.
+ */
+function buildBillingView(obj, totals, restaurantPct = 0) {
+    const billable = isBillableAdType(obj.adsType);
+    const live = Array.isArray(obj.billingWindows) && obj.billingWindows.length > 0;
+    const percentage = billable ? (live ? Number(obj.adCommissionPercentage) || 0 : Number(restaurantPct) || 0) : 0;
+    const chargedTotal = Number(totals?.totalCharged) || 0;
+    const outstanding = Number(totals?.outstanding) || 0;
+
+    // Payment label mirrors the ad lifecycle so it never claims "accruing" for an ad
+    // that is not running (pending / rejected / paused / expired).
+    const lifecycle = displayStatus(obj);
+    let paymentStatus;
+    if (!billable || percentage <= 0) paymentStatus = chargedTotal > 0 ? 'Charged' : 'Free';
+    else if (lifecycle === 'Pending') paymentStatus = 'Starts after approval';
+    else if (lifecycle === 'Rejected') paymentStatus = chargedTotal > 0 ? 'Charged' : 'Not charged';
+    else if (lifecycle === 'Paused') paymentStatus = chargedTotal > 0 ? 'Charged (paused)' : 'Paused - not charged';
+    else if (lifecycle === 'Expired') paymentStatus = chargedTotal > 0 ? 'Charged' : 'Not charged';
+    else paymentStatus = chargedTotal > 0 ? 'Charged' : 'Accruing';
+    return {
+        billable,
+        adCommissionPercentage: percentage,
+        chargedTotal,
+        chargedOutstanding: outstanding,
+        chargedPaidOut: Math.round((chargedTotal - outstanding) * 100) / 100,
+        chargedDays: Number(totals?.chargedDays) || 0,
+        paymentStatus
+    };
+}
+
+async function loadBillingContext(ads) {
+    const totalsMap = await getAdChargeTotalsByAd(ads.map((a) => a._id));
+    const restaurantIds = [...new Set(ads.map((a) => String(a.restaurantId)))];
+    const restaurants = restaurantIds.length
+        ? await FoodRestaurant.find({ _id: { $in: restaurantIds } })
+              .select('adCommissionPercentage')
+              .lean()
+        : [];
+    const pctMap = new Map(restaurants.map((r) => [String(r._id), Number(r.adCommissionPercentage) || 0]));
+    return { totalsMap, pctMap };
+}
+
+function billingFor(obj, ctx) {
+    return buildBillingView(obj, ctx.totalsMap.get(String(obj._id)), ctx.pctMap.get(String(obj.restaurantId)));
+}
+
+function toRestaurantView(ad, billing = null) {
     const obj = ad?.toObject ? ad.toObject() : { ...ad };
     const id = String(obj._id);
     return {
@@ -86,8 +166,9 @@ function toRestaurantView(ad) {
         adsPlaced: formatDate(obj.createdAt),
         adsCreated: formatDate(obj.createdAt),
         adsDetails: obj.adsType,
-        paymentStatus: obj.status === 'Approved' || displayStatus(obj) === 'Running' ? 'N/A' : 'Unpaid',
+        ...(billing || buildBillingView(obj, null, 0)),
         pauseNote: obj.status === 'Paused' ? 'Paused by restaurant' : '—',
+        billingWindows: undefined,
         duration: {
             start: formatDate(obj.startDate) !== 'N/A' ? formatDate(obj.startDate) : (obj.validity || 'N/A'),
             end: formatDate(obj.endDate) !== 'N/A' ? formatDate(obj.endDate) : (obj.validity || 'N/A')
@@ -95,9 +176,11 @@ function toRestaurantView(ad) {
     };
 }
 
-function toAdminListView(ad, index = 0) {
+function toAdminListView(ad, index = 0, billing = null) {
     const obj = ad?.toObject ? ad.toObject() : { ...ad };
     return {
+        ...(billing || buildBillingView(obj, null, 0)),
+        restaurantId: obj.restaurantId,
         sl: index + 1,
         _id: obj._id,
         adsId: obj.adsId,
@@ -114,13 +197,12 @@ function toAdminListView(ad, index = 0) {
         lifecycleStatus: obj.status,
         priority: obj.priority || '2',
         imageUrl: obj.imageUrl || '',
-        videoUrl: obj.videoUrl || '',
         description: obj.description || '',
         createdAt: obj.createdAt
     };
 }
 
-function toAdminRequestView(ad, index = 0) {
+function toAdminRequestView(ad, index = 0, billing = null) {
     const obj = ad?.toObject ? ad.toObject() : { ...ad };
     let requestStatus = 'new';
     if (obj.status === 'Rejected') requestStatus = 'denied';
@@ -129,6 +211,8 @@ function toAdminRequestView(ad, index = 0) {
     else requestStatus = 'new';
 
     return {
+        ...(billing || buildBillingView(obj, null, 0)),
+        restaurantId: obj.restaurantId,
         sl: index + 1,
         _id: obj._id,
         adsId: obj.adsId,
@@ -142,7 +226,6 @@ function toAdminRequestView(ad, index = 0) {
         requestType: obj.requestType,
         priority: obj.priority || '2',
         imageUrl: obj.imageUrl || '',
-        videoUrl: obj.videoUrl || '',
         description: obj.description || '',
         createdAt: obj.createdAt
     };
@@ -155,24 +238,12 @@ async function destroyCloudinary(publicId, resourceType = 'image') {
 async function uploadMediaFromFiles(files = {}) {
     const result = {};
     const imageFile = Array.isArray(files.image) ? files.image[0] : files.image;
-    const videoFile = Array.isArray(files.video) ? files.video[0] : files.video;
 
     try {
         if (imageFile?.buffer) {
             const uploaded = await uploadImageBufferDetailed(imageFile.buffer, 'food/advertisements');
             result.imageUrl = uploaded.secure_url;
             result.imagePublicId = uploaded.public_id;
-        }
-
-        if (videoFile?.buffer) {
-            const uploaded = await uploadBufferDetailed(videoFile.buffer, {
-                folder: 'food/advertisements',
-                resourceType: 'video',
-                mimeType: videoFile.mimetype,
-                originalName: videoFile.originalname
-            });
-            result.videoUrl = uploaded.secure_url;
-            result.videoPublicId = uploaded.public_id;
         }
     } catch (error) {
         const message = String(error?.message || '').trim();
@@ -205,7 +276,6 @@ function normalizePayload(body = {}, { allowPastStart = false } = {}) {
         description: String(body.description || '').trim(),
         adsType,
         fileDescription: String(body.fileDescription || '').trim(),
-        videoDescription: String(body.videoDescription || '').trim(),
         validity,
         startDate,
         endDate
@@ -217,6 +287,9 @@ export async function listRestaurantAdvertisements(restaurantId) {
         throw new ValidationError('Invalid restaurant');
     }
 
+    // Book any completed ad days first so charged totals are current.
+    await settleAdvertisementCharges({ restaurantId }).catch(() => null);
+
     const ads = await FoodAdvertisement.find({
         restaurantId,
         isDeleted: false
@@ -224,7 +297,8 @@ export async function listRestaurantAdvertisements(restaurantId) {
         .sort({ createdAt: -1 })
         .lean();
 
-    return ads.map(toRestaurantView);
+    const ctx = await loadBillingContext(ads);
+    return ads.map((ad) => toRestaurantView(ad, billingFor(ad, ctx)));
 }
 
 export async function getRestaurantAdvertisement(restaurantId, adId) {
@@ -239,7 +313,9 @@ export async function getRestaurantAdvertisement(restaurantId, adId) {
     }).lean();
 
     if (!ad) throw new ValidationError('Advertisement not found');
-    return toRestaurantView(ad);
+    await settleAdvertisementCharges({ restaurantId, adId: ad._id }).catch(() => null);
+    const ctx = await loadBillingContext([ad]);
+    return toRestaurantView(ad, billingFor(ad, ctx));
 }
 
 export async function createRestaurantAdvertisement(restaurantId, body, files = {}) {
@@ -255,13 +331,7 @@ export async function createRestaurantAdvertisement(restaurantId, body, files = 
     const payload = normalizePayload(body);
     const media = await uploadMediaFromFiles(files);
 
-    if (payload.adsType === 'Video Promotion' && !media.videoUrl) {
-        throw new ValidationError('Video file is required for Video Promotion');
-    }
-    if (
-        ['Image Promotion', 'Banner Promotion', 'Restaurant Promotion'].includes(payload.adsType) &&
-        !media.imageUrl
-    ) {
+    if (!media.imageUrl) {
         throw new ValidationError('Image file is required for this advertisement type');
     }
 
@@ -304,17 +374,22 @@ export async function updateRestaurantAdvertisement(restaurantId, adId, body, fi
         description: body.description ?? existing.description,
         adsType: body.adsType || body.category || existing.adsType,
         validity: body.validity ?? existing.validity,
-        fileDescription: body.fileDescription ?? existing.fileDescription,
-        videoDescription: body.videoDescription ?? existing.videoDescription
+        fileDescription: body.fileDescription ?? existing.fileDescription
     }, { allowPastStart: true });
 
     const media = await uploadMediaFromFiles(files);
+    if (!media.imageUrl && !existing.imageUrl) {
+        throw new ValidationError('Image file is required for this advertisement type');
+    }
 
     if (media.imageUrl && existing.imagePublicId) {
         await destroyCloudinary(existing.imagePublicId, 'image');
     }
-    if (media.videoUrl && existing.videoPublicId) {
+    // Legacy video ads: drop the old video asset once the ad is converted to an image ad.
+    if (existing.videoPublicId) {
         await destroyCloudinary(existing.videoPublicId, 'video');
+        existing.videoUrl = '';
+        existing.videoPublicId = '';
     }
 
     Object.assign(existing, payload, media, {
@@ -365,10 +440,12 @@ export async function pauseRestaurantAdvertisement(restaurantId, adId) {
 }
 
 export async function listAdminAdvertisements() {
+    await settleAdvertisementCharges().catch(() => null);
     const ads = await FoodAdvertisement.find({ isDeleted: false })
         .sort({ createdAt: -1 })
         .lean();
-    return ads.map((ad, idx) => toAdminListView(ad, idx));
+    const ctx = await loadBillingContext(ads);
+    return ads.map((ad, idx) => toAdminListView(ad, idx, billingFor(ad, ctx)));
 }
 
 export async function createAdminAdvertisement(body = {}, files = {}) {
@@ -385,13 +462,7 @@ export async function createAdminAdvertisement(body = {}, files = {}) {
     const payload = normalizePayload(body);
     const media = await uploadMediaFromFiles(files);
 
-    if (payload.adsType === 'Video Promotion' && !media.videoUrl) {
-        throw new ValidationError('Video file is required for Video Promotion');
-    }
-    if (
-        ['Image Promotion', 'Banner Promotion', 'Restaurant Promotion'].includes(payload.adsType) &&
-        !media.imageUrl
-    ) {
+    if (!media.imageUrl) {
         throw new ValidationError('Image file is required for this advertisement type');
     }
 
@@ -425,7 +496,8 @@ export async function listAdminAdvertisementRequests() {
         .sort({ createdAt: -1 })
         .lean();
 
-    return all.map((ad, idx) => toAdminRequestView(ad, idx));
+    const ctx = await loadBillingContext(all);
+    return all.map((ad, idx) => toAdminRequestView(ad, idx, billingFor(ad, ctx)));
 }
 
 export async function updateAdminAdvertisementStatus(adId, status) {
@@ -444,14 +516,26 @@ export async function updateAdminAdvertisementStatus(adId, status) {
         throw new ValidationError('Status must be Approved or Rejected');
     }
 
-    const updated = await FoodAdvertisement.findOneAndUpdate(
-        { _id: adId, isDeleted: false },
-        { $set: { status: normalized } },
-        { new: true }
-    ).lean();
+    // save() (not findOneAndUpdate) so the billing-window hook opens/closes the window.
+    const ad = await FoodAdvertisement.findOne({ _id: adId, isDeleted: false });
+    if (!ad) throw new ValidationError('Advertisement not found');
 
-    if (!updated) throw new ValidationError('Advertisement not found');
-    return toAdminRequestView(updated);
+    if (normalized === 'Approved' && ad.status !== 'Approved') {
+        // Billing starts at approval, so never "approve" something that cannot run.
+        if (ad.status === 'Paused') {
+            throw new ValidationError('This advertisement is paused by the restaurant. They must resume it.');
+        }
+        const { endDay } = getAdCampaignDays(ad);
+        if (endDay && endDay < istToday()) {
+            throw new ValidationError('Advertisement validity has already ended');
+        }
+    }
+    ad.status = normalized;
+    await ad.save();
+
+    const updated = ad.toObject();
+    const ctx = await loadBillingContext([updated]);
+    return toAdminRequestView(updated, 0, billingFor(updated, ctx));
 }
 
 export async function updateAdminAdvertisementPriority(adId, priority) {
@@ -478,14 +562,15 @@ export async function deleteAdminAdvertisement(adId) {
         throw new ValidationError('Invalid advertisement id');
     }
 
-    const updated = await FoodAdvertisement.findOneAndUpdate(
-        { _id: adId, isDeleted: false },
-        { $set: { isDeleted: true, status: 'Paused' } },
-        { new: true }
-    ).lean();
+    // Book completed live days before the ad disappears from billing queries.
+    await settleAdvertisementCharges({ adId }).catch(() => null);
 
-    if (!updated) throw new ValidationError('Advertisement not found');
-    return { deleted: true, id: String(updated._id) };
+    const ad = await FoodAdvertisement.findOne({ _id: adId, isDeleted: false });
+    if (!ad) throw new ValidationError('Advertisement not found');
+    ad.isDeleted = true;
+    ad.status = 'Paused';
+    await ad.save();
+    return { deleted: true, id: String(ad._id) };
 }
 
 export async function updateAdminAdvertisement(adId, body, files = {}) {
@@ -504,17 +589,22 @@ export async function updateAdminAdvertisement(adId, body, files = {}) {
         description: body.description ?? existing.description,
         adsType: body.adsType || body.category || existing.adsType,
         validity: body.validity ?? existing.validity,
-        fileDescription: body.fileDescription ?? existing.fileDescription,
-        videoDescription: body.videoDescription ?? existing.videoDescription
+        fileDescription: body.fileDescription ?? existing.fileDescription
     }, { allowPastStart: true });
 
     const media = await uploadMediaFromFiles(files);
+    if (!media.imageUrl && !existing.imageUrl) {
+        throw new ValidationError('Image file is required for this advertisement type');
+    }
 
     if (media.imageUrl && existing.imagePublicId) {
         await destroyCloudinary(existing.imagePublicId, 'image');
     }
-    if (media.videoUrl && existing.videoPublicId) {
+    // Legacy video ads: drop the old video asset once the ad is converted to an image ad.
+    if (existing.videoPublicId) {
         await destroyCloudinary(existing.videoPublicId, 'video');
+        existing.videoUrl = '';
+        existing.videoPublicId = '';
     }
 
     Object.assign(existing, payload, media);

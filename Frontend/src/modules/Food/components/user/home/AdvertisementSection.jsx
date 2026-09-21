@@ -1,14 +1,6 @@
 import React from 'react';
 import OptimizedImage from "@food/components/OptimizedImage";
 
-const resolveMediaUrl = (url, backendOrigin) => {
-  if (!url || typeof url !== 'string') return "";
-  const normalizedUrl = url.replace(/\\/g, '/');
-  if (/^(https?:|\/\/|data:|blob:)/i.test(normalizedUrl.trim())) return normalizedUrl;
-  const origin = backendOrigin ? backendOrigin.replace(/\/$/, "") : '';
-  return `${origin}${normalizedUrl.startsWith('/') ? normalizedUrl : `/${normalizedUrl}`}`;
-};
-
 export default function AdvertisementSection({ advertisements, BACKEND_ORIGIN }) {
   if (!advertisements || advertisements.length === 0) {
     return null;
@@ -24,18 +16,7 @@ export default function AdvertisementSection({ advertisements, BACKEND_ORIGIN })
           </div>
           
           {/* Content */}
-          {ad.adsType === 'Video Promotion' && ad.videoUrl ? (
-            <div className="relative aspect-video w-full bg-black">
-              <video
-                src={resolveMediaUrl(ad.videoUrl, BACKEND_ORIGIN)}
-                className="w-full h-full object-cover"
-                autoPlay
-                muted
-                loop
-                playsInline
-              />
-            </div>
-          ) : (ad.imageUrl ? (
+          {ad.imageUrl ? (
             <div className="relative aspect-[21/9] w-full bg-gray-100">
               <OptimizedImage
                 src={ad.imageUrl}
@@ -44,7 +25,7 @@ export default function AdvertisementSection({ advertisements, BACKEND_ORIGIN })
                 className="w-full h-full object-cover"
               />
             </div>
-          ) : null)}
+          ) : null}
 
           {/* Text Content (optional display of title if it's not a pure banner) */}
           {(ad.title || ad.restaurantName) && (

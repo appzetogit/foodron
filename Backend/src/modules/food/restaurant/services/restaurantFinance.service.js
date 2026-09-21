@@ -3,7 +3,8 @@
  * not from `food_restaurant_wallets.balance`.
  *
  * Available withdrawal = sum(unsettled delivered `restaurantShare`) + wallet
- * `referralEarnings` − pending/processing withdrawals.
+ * `referralEarnings` − outstanding advertisement charges − pending/processing
+ * withdrawals (floored at 0; the signed value is exposed as `netBalance`).
  *
  * An empty `food_restaurant_wallets` collection after orders-only activity is
  * expected for legacy restaurants; new ones get a zero-balance row on register/
@@ -14,6 +15,7 @@
  */
 import mongoose from 'mongoose';
 import { FoodTransaction } from '../../orders/models/foodTransaction.model.js';
+import { buildRestaurantEarningBreakdown } from '../../orders/utils/restaurantEarningBreakdown.util.js';
 import { FoodRestaurant } from '../models/restaurant.model.js';
 import { FoodRestaurantWallet, ensureRestaurantWallet } from '../models/restaurantWallet.model.js';
 import { FoodRestaurantWithdrawal } from '../models/foodRestaurantWithdrawal.model.js';
@@ -21,6 +23,12 @@ import { FoodDailyPass } from '../../subscriptions/models/foodDailyPass.model.js
 import { FoodWalletLedger } from '../../subscriptions/models/foodWalletLedger.model.js';
 import { getRestaurantWithdrawalLimitSettings } from '../../admin/services/admin.service.js';
 import { realizeFoodQuickRestaurantShare } from '../../orders/services/foodTransaction.service.js';
+import {
+    settleAdvertisementCharges,
+    getOutstandingAdCharges,
+    getRestaurantAdBilling,
+} from '../../admin/services/advertisementBilling.service.js';
+import { FoodAdvertisementCharge } from '../../admin/models/advertisementCharge.model.js';
 import { logger } from '../../../../utils/logger.js';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone.js';
@@ -221,12 +229,25 @@ export async function getRestaurantAvailableWithdrawalBalance(
     { session = null, skipSelfHeal = false } = {}
 ) {
     if (!restaurantId || !mongoose.Types.ObjectId.isValid(restaurantId)) {
-        return { availableBalance: 0, globalEstimatedPayout: 0, referralBalance: 0, totalPendingWithdrawals: 0 };
+        return {
+            availableBalance: 0,
+            globalEstimatedPayout: 0,
+            referralBalance: 0,
+            totalPendingWithdrawals: 0,
+            adDeductions: 0,
+            netBalance: 0,
+        };
     }
 
     // Self-heal outside Mongo sessions (withdrawal txn must not nest heal writes).
     if (!session && !skipSelfHeal) {
         await selfHealRestaurantFinanceLedger(restaurantId);
+        // Book completed ad days so the deduction below is up to date.
+        try {
+            await settleAdvertisementCharges({ restaurantId });
+        } catch (err) {
+            logger.warn(`[RestaurantFinance] Ad charge settle failed for ${restaurantId}: ${err?.message || err}`);
+        }
     }
 
     const rid = new mongoose.Types.ObjectId(restaurantId);
@@ -264,8 +285,13 @@ export async function getRestaurantAvailableWithdrawalBalance(
         session ? { session } : undefined
     );
 
-    const [allUnsettledTransactionsRaw, wallet, pendingWithdrawalsAgg] =
-        await Promise.all([unsettledQuery, walletQuery, pendingAgg]);
+    const [allUnsettledTransactionsRaw, wallet, pendingWithdrawalsAgg, adDeductions] =
+        await Promise.all([
+            unsettledQuery,
+            walletQuery,
+            pendingAgg,
+            getOutstandingAdCharges(restaurantId, { session }),
+        ]);
 
     const allUnsettledTransactions = allUnsettledTransactionsRaw.filter((tx) =>
         isDeliveredOrderForPayout(tx.orderId)
@@ -279,9 +305,13 @@ export async function getRestaurantAvailableWithdrawalBalance(
 
     const referralBalance = Number(wallet?.referralEarnings || 0);
     const totalPendingWithdrawals = Number(pendingWithdrawalsAgg?.[0]?.total || 0);
+    // Signed wallet position: can go negative when ad charges exceed what is left
+    // unsettled (earnings already withdrawn). Later orders offset it automatically.
+    const netBalance =
+        Math.round((globalEstimatedPayout + referralBalance - adDeductions) * 100) / 100;
     const availableBalance = Math.max(
         0,
-        globalEstimatedPayout + referralBalance - totalPendingWithdrawals
+        Math.round((netBalance - totalPendingWithdrawals) * 100) / 100
     );
 
     return {
@@ -289,6 +319,8 @@ export async function getRestaurantAvailableWithdrawalBalance(
         globalEstimatedPayout,
         referralBalance,
         totalPendingWithdrawals,
+        adDeductions,
+        netBalance,
     };
 }
 
@@ -335,9 +367,9 @@ function mapTransactionToCycleOrder(tx) {
         Number(order?.pricing?.total ?? 0) - Number(order?.pricing?.tax ?? 0) || 0
     );
     /**
-     * Restaurant-owned gross: item subtotal + packaging only.
-     * Delivery/platform fees are platform revenue and must never appear here,
-     * so this stays equal to restaurantShare + restaurantCommission.
+     * Restaurant-owned gross: item subtotal + packaging only (platform fees excluded).
+     * Payout = gross − commission − restaurant delivery fee − restaurant-borne discounts
+     * (menu + coupon) [+ quick share]. See `breakdown` for each component.
      */
     const restaurantGross = Math.max(
         0,
@@ -368,6 +400,8 @@ function mapTransactionToCycleOrder(tx) {
         payout: restaurantShare,
         restaurantEarning: restaurantShare,
         commission,
+        /** Exact payout maths from the ledger (commission, delivery fee, discount shares) */
+        breakdown: buildRestaurantEarningBreakdown(tx),
         paymentMethod: tx.paymentMethod || order?.payment?.method || 'N/A',
         orderStatus: order?.orderStatus || order?.deliveryState?.currentPhase || order?.deliveryState?.status || 'N/A',
         status: tx.status
@@ -380,6 +414,11 @@ export async function getRestaurantFinance(restaurantId, query = {}) {
 
     // Repair missed capture / Quick Share before reading Hub balances.
     await selfHealRestaurantFinanceLedger(restaurantId);
+    try {
+        await settleAdvertisementCharges({ restaurantId });
+    } catch (err) {
+        logger.warn(`[RestaurantFinance] Ad charge settle failed for ${restaurantId}: ${err?.message || err}`);
+    }
 
     // Fetch restaurant profile for header display.
     const restaurant = await FoodRestaurant.findById(rid)
@@ -414,6 +453,8 @@ export async function getRestaurantFinance(restaurantId, query = {}) {
         (sum, o) => sum + (Number(o.payout) || 0),
         0
     );
+    const cycleSum = (pick) =>
+        Math.round(currentCycleOrders.reduce((sum, o) => sum + (Number(pick(o.breakdown)) || 0), 0) * 100) / 100;
 
     // Global estimated payout: unsettled + delivered only (excludes cancelled / in-progress).
     // Lifetime order earnings from food_transactions (not wallet.totalEarnings).
@@ -423,16 +464,34 @@ export async function getRestaurantFinance(restaurantId, query = {}) {
             globalEstimatedPayout,
             referralBalance,
             totalPendingWithdrawals,
+            adDeductions,
+            netBalance,
         },
         totalOrderEarnings,
         wallet,
+        adBilling,
+        cycleAdAgg,
     ] = await Promise.all([
         getRestaurantAvailableWithdrawalBalance(restaurantId, { skipSelfHeal: true }),
         getRestaurantLifetimeOrderEarnings(restaurantId),
         FoodRestaurantWallet.findOne({ restaurantId: rid })
             .select('balance referralEarnings totalEarnings')
             .lean(),
+        getRestaurantAdBilling(restaurantId, { limit: 1 }),
+        FoodAdvertisementCharge.aggregate([
+            {
+                $match: {
+                    restaurantId: rid,
+                    day: {
+                        $gte: dayjs(nowWindow.start).format('YYYY-MM-DD'),
+                        $lte: dayjs(nowWindow.end).format('YYYY-MM-DD'),
+                    },
+                },
+            },
+            { $group: { _id: null, total: { $sum: '$amount' } } },
+        ]),
     ]);
+    const cycleAdCharges = Math.round((Number(cycleAdAgg?.[0]?.total) || 0) * 100) / 100;
 
     const referralLifetimeEarnings = Number(wallet?.totalEarnings || 0);
     const totalEarnings =
@@ -443,6 +502,14 @@ export async function getRestaurantFinance(restaurantId, query = {}) {
         end: { ...nowWindow.endMeta },
         /** Cycle-scoped order payout (not lifetime — see earnings.totalEarnings) */
         totalEarnings: currentCycleEstimatedPayout,
+        /** Discounts funded by the restaurant (deducted from earning) in this cycle */
+        menuDiscountShare: cycleSum((b) => b?.menuDiscountRestaurantShare),
+        couponDiscountShare: cycleSum((b) => b?.couponDiscountRestaurantShare),
+        /** Discounts funded by admin in this cycle (not deducted from restaurant) */
+        adminFundedDiscount: cycleSum((b) => b?.adminDiscountShare),
+        /** Ad revenue share charged for ad days inside this cycle */
+        adCharges: cycleAdCharges,
+        netEarnings: Math.round((currentCycleEstimatedPayout - cycleAdCharges) * 100) / 100,
         totalWithdrawn: totalPendingWithdrawals,
         estimatedPayout: availableBalance, // This is what UI shows as "Estimated Payout" (Available Balance)
         totalOrders: currentCycleOrders.length,
@@ -500,6 +567,13 @@ export async function getRestaurantFinance(restaurantId, query = {}) {
         earnings: {
             availableBalance: availableBalance,
             pendingPayout: globalEstimatedPayout,
+            /** Outstanding advertisement charges deducted from the balance */
+            adDeductions,
+            /** Signed wallet position (may be negative when ad charges exceed earnings) */
+            netBalance,
+            adCommissionPercentage: adBilling.percentage,
+            adTodayAccrual: adBilling.todayAccrual,
+            adLifetimeCharged: adBilling.allTimeTotals.totalCharged,
             referralEarnings: referralBalance,
             /** Lifetime delivered order share from food_transactions */
             totalOrderEarnings,

@@ -135,6 +135,7 @@ export const adminSidebarMenu = [
           { label: "New Advertisement", path: "/admin/food/advertisement/new", permissionKey: "new" },
           { label: "Advertisement List", path: "/admin/food/advertisement", permissionKey: "list" },
           { label: "Advertisement Requests", path: "/admin/food/advertisement/requests", permissionKey: "requests" },
+          { label: "Ad Billing", path: "/admin/food/advertisement/billing", permissionKey: "billing" },
         ],
       },
     ],

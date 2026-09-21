@@ -6,7 +6,6 @@ import { adminAPI } from "@food/api"
 
 const ADS_TYPES = [
   "Restaurant Promotion",
-  "Video Promotion",
   "Image Promotion",
   "Banner Promotion",
 ]
@@ -21,19 +20,18 @@ export default function EditAdvertisementDialog({ isOpen, onOpenChange, ad, onSu
     priority: "2",
   })
   const [imageFile, setImageFile] = useState(null)
-  const [videoFile, setVideoFile] = useState(null)
 
   useEffect(() => {
     if (ad && isOpen) {
       setFormData({
         title: ad.adsTitle || ad.title || "",
         description: ad.description || "",
-        adsType: ad.adsType || "Restaurant Promotion",
+        // Video Promotion is discontinued; legacy video ads must be re-typed to an image type.
+        adsType: !ad.adsType || ad.adsType === "Video Promotion" ? "Image Promotion" : ad.adsType,
         validity: ad.duration || ad.validity || "",
         priority: ad.priority ? String(ad.priority) : "2",
       })
       setImageFile(null)
-      setVideoFile(null)
     }
   }, [ad, isOpen])
 
@@ -57,7 +55,6 @@ export default function EditAdvertisementDialog({ isOpen, onOpenChange, ad, onSu
       payload.append("category", formData.adsType)
       payload.append("validity", formData.validity.trim())
       if (imageFile) payload.append("image", imageFile)
-      if (videoFile) payload.append("video", videoFile)
 
       await adminAPI.updateAdvertisement(ad._id, payload)
       
@@ -179,29 +176,16 @@ export default function EditAdvertisementDialog({ isOpen, onOpenChange, ad, onSu
             </div>
           </div>
 
-          {formData.adsType === "Video Promotion" ? (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Video</label>
-              <input
-                type="file"
-                accept="video/*"
-                onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
-                className="w-full text-sm"
-              />
-              <p className="text-xs text-slate-500 mt-1">Leave empty to keep existing video</p>
-            </div>
-          ) : (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Image</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                className="w-full text-sm"
-              />
-              <p className="text-xs text-slate-500 mt-1">Leave empty to keep existing image</p>
-            </div>
-          )}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Image</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+              className="w-full text-sm"
+            />
+            <p className="text-xs text-slate-500 mt-1">Leave empty to keep existing image</p>
+          </div>
 
           <DialogFooter className="pt-4 border-t border-slate-100">
             <button

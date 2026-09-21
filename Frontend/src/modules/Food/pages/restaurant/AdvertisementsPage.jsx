@@ -24,6 +24,8 @@ export default function AdvertisementsPage() {
   const [openMenuId, setOpenMenuId] = useState(null)
   const [advertisements, setAdvertisements] = useState([])
   const [loading, setLoading] = useState(true)
+  const [billing, setBilling] = useState(null)
+  const money = (n) => `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   const fetchAds = useCallback(async () => {
     try {
@@ -31,6 +33,10 @@ export default function AdvertisementsPage() {
       const response = await restaurantAPI.getAdvertisements()
       const data = response?.data?.data
       setAdvertisements(Array.isArray(data) ? data : [])
+      restaurantAPI
+        .getAdvertisementBilling({ limit: 1 })
+        .then((res) => setBilling(res?.data?.data || null))
+        .catch(() => setBilling(null))
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to load advertisements")
       setAdvertisements([])
@@ -189,6 +195,44 @@ export default function AdvertisementsPage() {
       </div>
 
       <div className="px-4 py-4 space-y-3">
+        {billing && (
+          <Card className="bg-white shadow-sm border border-gray-100">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-gray-900">Ad payment</h3>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700">
+                  {billing.percentage > 0 ? `${billing.percentage}% of daily earning` : "Free"}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {billing.percentage > 0
+                  ? "For every day an ad is live, this share of that day's order earnings is deducted from your wallet."
+                  : "No ad charges are set for your restaurant."}
+              </p>
+              <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+                <div className="rounded-lg bg-gray-50 p-2">
+                  <p className="text-[10px] font-bold uppercase text-gray-400">Total paid</p>
+                  <p className="text-sm font-bold text-gray-900">{money(billing.allTimeTotals?.totalCharged)}</p>
+                </div>
+                <div className="rounded-lg bg-amber-50 p-2">
+                  <p className="text-[10px] font-bold uppercase text-amber-600">In wallet dues</p>
+                  <p className="text-sm font-bold text-amber-700">{money(billing.allTimeTotals?.outstanding)}</p>
+                </div>
+                <div className="rounded-lg bg-blue-50 p-2">
+                  <p className="text-[10px] font-bold uppercase text-blue-600">Today (live)</p>
+                  <p className="text-sm font-bold text-blue-700">{money(billing.todayAccrual)}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => navigate("/food/restaurant/hub-finance")}
+                className="mt-3 text-xs font-medium text-red-600 hover:underline"
+              >
+                View wallet &amp; day-wise charges
+              </button>
+            </CardContent>
+          </Card>
+        )}
+
         {loading && (
           <div className="text-center py-12">
             <p className="text-gray-500 text-sm">Loading advertisements...</p>
@@ -222,6 +266,12 @@ export default function AdvertisementsPage() {
                       <div className="space-y-1 text-xs text-gray-600">
                         <p>Ads Placed: {ad.adsPlaced || "N/A"}</p>
                         <p>Duration: {ad.duration?.start || "N/A"} - {ad.duration?.end || "N/A"}</p>
+                        <p>
+                          Payment:{" "}
+                          {ad.billable && Number(ad.adCommissionPercentage) > 0
+                            ? `${ad.adCommissionPercentage}% / day • Charged ${money(ad.chargedTotal)} (${ad.chargedDays || 0} day${ad.chargedDays === 1 ? "" : "s"}) • ${ad.paymentStatus}`
+                            : ad.paymentStatus || "Free"}
+                        </p>
                       </div>
                     </div>
 
