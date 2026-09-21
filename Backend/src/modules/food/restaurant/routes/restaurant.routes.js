@@ -87,7 +87,8 @@ import {
     createRestaurantAdvertisementController,
     updateRestaurantAdvertisementController,
     deleteRestaurantAdvertisementController,
-    pauseRestaurantAdvertisementController
+    pauseRestaurantAdvertisementController,
+    getRestaurantAdvertisementBillingController
 } from '../controllers/advertisement.controller.js';
 
 import { cacheResponse, invalidateCache } from '../../../../middleware/cache.js';
@@ -103,13 +104,13 @@ const requireRestaurant = (req, res, next) => {
 };
 
 const handleAdvertisementUpload = (req, res, next) => {
-    upload.fields([{ name: 'image', maxCount: 1 }, { name: 'video', maxCount: 1 }])(req, res, (err) => {
+    upload.fields([{ name: 'image', maxCount: 1 }])(req, res, (err) => {
         if (!err) return next();
         if (err?.code === 'LIMIT_FILE_SIZE') {
             return sendError(res, 400, 'File size too large. Maximum 5MB allowed per file.');
         }
         if (err?.code === 'LIMIT_UNEXPECTED_FILE') {
-            return sendError(res, 400, 'Unexpected file field. Use image or video uploads only.');
+            return sendError(res, 400, 'Unexpected file field. Use image uploads only.');
         }
         return sendError(res, 400, err.message || 'Failed to upload advertisement files');
     });
@@ -370,6 +371,7 @@ router.delete('/menu-discounts/:id', authMiddleware, requireRestaurant, requireA
 
 // Advertisements (restaurant dashboard)
 router.get('/advertisements', authMiddleware, requireRestaurant, requireApprovedRestaurant, listRestaurantAdvertisementsController);
+router.get('/advertisements/billing', authMiddleware, requireRestaurant, requireApprovedRestaurant, getRestaurantAdvertisementBillingController);
 router.get('/advertisements/:id', authMiddleware, requireRestaurant, requireApprovedRestaurant, getRestaurantAdvertisementController);
 router.post(
     '/advertisements',

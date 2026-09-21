@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { ValidationError, ForbiddenError } from '../../../../core/auth/errors.js';
 import { FoodMenuDiscount } from '../models/menuDiscount.model.js';
+import { FoodTransaction } from '../../orders/models/foodTransaction.model.js';
 import { resolveRestaurantDocument } from '../../shared/restaurantIdentity.util.js';
 import {
     MENU_DISCOUNT_MIN_PERCENT,
@@ -168,6 +169,47 @@ export async function deleteMenuDiscount(actor, id) {
     return { id: String(id) };
 }
 
+/**
+ * What menu discounts have actually cost so far, split by who funds them. Numbers come from
+ * the settlement ledger (food_transactions) and count only delivered orders — cancelled /
+ * refunded orders never cost anyone anything. Shares are stored net of partial refunds.
+ */
+async function getMenuDiscountUsage({ discountIds = null, restaurantId = null } = {}) {
+    const match = {
+        status: { $nin: ['failed', 'refunded'] },
+        'pricing.menuDiscountInfo.discountId': discountIds
+            ? { $in: discountIds }
+            : { $exists: true, $ne: null },
+    };
+    if (restaurantId) match.restaurantId = restaurantId;
+
+    const rows = await FoodTransaction.aggregate([
+        { $match: match },
+        { $lookup: { from: 'food_orders', localField: 'orderId', foreignField: '_id', as: 'order' } },
+        { $unwind: { path: '$order', preserveNullAndEmptyArrays: true } },
+        { $match: { 'order.orderStatus': 'delivered' } },
+        {
+            $group: {
+                _id: discountIds ? '$pricing.menuDiscountInfo.discountId' : null,
+                orders: { $sum: 1 },
+                adminShare: { $sum: { $ifNull: ['$amounts.menuAdminDiscountShare', 0] } },
+                restaurantShare: { $sum: { $ifNull: ['$amounts.menuRestaurantDiscountShare', 0] } },
+                orderValue: { $sum: { $ifNull: ['$pricing.subtotal', 0] } },
+            },
+        },
+    ]);
+    const shape = (r) => ({
+        orders: r.orders,
+        discountGiven: round2(r.adminShare + r.restaurantShare),
+        adminBorne: round2(r.adminShare),
+        restaurantBorne: round2(r.restaurantShare),
+        orderValue: round2(r.orderValue),
+    });
+    const zero = { orders: 0, discountGiven: 0, adminBorne: 0, restaurantBorne: 0, orderValue: 0 };
+    if (!discountIds) return rows[0] ? shape(rows[0]) : zero;
+    return new Map(rows.map((r) => [String(r._id), shape(r)]));
+}
+
 export async function listMenuDiscounts(actor, query = {}) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 20));
@@ -195,8 +237,19 @@ export async function listMenuDiscounts(actor, query = {}) {
         FoodMenuDiscount.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
         FoodMenuDiscount.countDocuments(filter),
     ]);
+
+    const usageById = await getMenuDiscountUsage({ discountIds: rows.map((r) => r._id) });
+    const summary = await getMenuDiscountUsage({
+        restaurantId: filter.restaurantId || null,
+    });
     return {
-        discounts: rows.map((r) => serializeMenuDiscount(r, now)),
+        discounts: rows.map((r) => ({
+            ...serializeMenuDiscount(r, now),
+            usage: usageById.get(String(r._id)) || {
+                orders: 0, discountGiven: 0, adminBorne: 0, restaurantBorne: 0, orderValue: 0,
+            },
+        })),
+        summary,
         total, page, limit, totalPages: Math.ceil(total / limit) || 1,
     };
 }

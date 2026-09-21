@@ -27,6 +27,7 @@ export default function AdRequests() {
     restaurantInfo: true,
     adsType: true,
     duration: true,
+    payment: true,
     status: true,
     actions: true,
   })
@@ -56,6 +57,7 @@ export default function AdRequests() {
     restaurantInfo: "Restaurant Info",
     adsType: "Ads Type",
     duration: "Duration",
+    payment: "Ad Payment",
     status: "Status",
     actions: "Actions",
   }
@@ -154,6 +156,7 @@ export default function AdRequests() {
       restaurantInfo: true,
       adsType: true,
       duration: true,
+      payment: true,
       status: true,
       actions: true,
     })
@@ -296,6 +299,7 @@ export default function AdRequests() {
                 {visibleColumns.restaurantInfo && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Restaurant Info</th>}
                 {visibleColumns.adsType && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Ads Type</th>}
                 {visibleColumns.duration && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Duration</th>}
+                {visibleColumns.payment && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Ad Payment</th>}
                 {visibleColumns.status && <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">Status</th>}
                 {visibleColumns.actions && <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">Action</th>}
               </tr>
@@ -350,6 +354,22 @@ export default function AdRequests() {
                     {visibleColumns.duration && (
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-slate-700">{request.duration}</span>
+                      </td>
+                    )}
+                    {visibleColumns.payment && (
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {request.billable && Number(request.adCommissionPercentage) > 0 ? (
+                          <div className="text-xs leading-5">
+                            <p className="font-semibold text-slate-800">{Number(request.adCommissionPercentage)}% of daily earning</p>
+                            <p className="text-slate-500">
+                              Charged ₹{Number(request.chargedTotal || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {" • "}{request.chargedDays || 0} day(s)
+                            </p>
+                            <p className="text-slate-400">{request.paymentStatus}</p>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-500">{request.paymentStatus || "Free"}</span>
+                        )}
                       </td>
                     )}
                     {visibleColumns.status && (
@@ -530,24 +550,10 @@ export default function AdRequests() {
                 </div>
               )}
 
-              {selectedRequest.videoDescription && (
-                <div className="mt-4">
-                  <p className="text-sm font-semibold text-slate-700 mb-1">Video Description</p>
-                  <p className="text-sm text-slate-900 bg-slate-50 p-3 rounded-lg border border-slate-100">{selectedRequest.videoDescription}</p>
-                </div>
-              )}
-
-              {(selectedRequest.imageUrl || selectedRequest.image || selectedRequest.profileImage || selectedRequest.videoUrl || selectedRequest.video || selectedRequest.coverImage) && (
+              {(selectedRequest.imageUrl || selectedRequest.image || selectedRequest.profileImage) && (
                 <div className="pt-4 border-t border-slate-100 mt-4">
                   <p className="text-sm font-semibold text-slate-700 mb-2">Banner / Media</p>
                   <div className="rounded-lg overflow-hidden bg-slate-50 border border-slate-200 flex items-center justify-center p-2">
-                    {selectedRequest.adsType === "Video Promotion" || selectedRequest.videoUrl || selectedRequest.video || selectedRequest.coverImage ? (
-                      <video 
-                        src={selectedRequest.videoUrl || selectedRequest.video || selectedRequest.coverImage} 
-                        controls 
-                        className="max-h-[250px] w-auto rounded"
-                      />
-                    ) : (
                       <img 
                         src={selectedRequest.imageUrl || selectedRequest.image || selectedRequest.profileImage} 
                         alt="Advertisement Banner" 
@@ -556,7 +562,6 @@ export default function AdRequests() {
                           e.target.style.display = 'none';
                         }}
                       />
-                    )}
                   </div>
                 </div>
               )}

@@ -1264,6 +1264,14 @@ export const adminAPI = {
     apiClient.patch(`/food/admin/advertisements/${id}/priority`, { priority }, { contextModule: "admin" }),
   deleteAdvertisement: (id) =>
     apiClient.delete(`/food/admin/advertisements/${id}`, { contextModule: "admin" }),
+  /** Ad revenue share: totals, per-restaurant breakdown, per-day charges. */
+  getAdvertisementBilling: (params = {}) =>
+    apiClient.get("/food/admin/advertisement-billing", { params, contextModule: "admin" }),
+  /** Per-restaurant ad percentage list. */
+  getRestaurantAdSettings: (params = {}) =>
+    apiClient.get("/food/admin/advertisement-billing/restaurants", { params, contextModule: "admin" }),
+  setRestaurantAdPercentage: (restaurantId, percentage) =>
+    apiClient.patch(`/food/admin/advertisement-billing/restaurants/${String(restaurantId)}`, { percentage }, { contextModule: "admin" }),
   getDeletedAccounts: () =>
     apiClient.get("/food/admin/deleted-accounts", { contextModule: "admin" }),
   reactivateAccount: (id, role) =>
@@ -1970,6 +1978,11 @@ export const restaurantAPI = {
     apiClient.delete(`/food/restaurant/menu-discounts/${String(id)}`, { contextModule: "restaurant" }),
   getAdvertisements: () =>
     apiClient.get("/food/restaurant/advertisements", {
+      contextModule: "restaurant",
+    }),
+  getAdvertisementBilling: (params = {}) =>
+    apiClient.get("/food/restaurant/advertisements/billing", {
+      params,
       contextModule: "restaurant",
     }),
   getAdvertisement: (id) =>

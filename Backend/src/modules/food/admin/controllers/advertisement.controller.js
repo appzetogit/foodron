@@ -7,6 +7,11 @@ import {
     deleteAdminAdvertisement,
     updateAdminAdvertisement
 } from '../../restaurant/services/advertisement.service.js';
+import {
+    getAdminAdBilling,
+    listRestaurantAdSettings,
+    setRestaurantAdPercentage
+} from '../services/advertisementBilling.service.js';
 import { sendResponse } from '../../../../utils/response.js';
 import { invalidateCache } from '../../../../middleware/cache.js';
 
@@ -74,6 +79,38 @@ export const updateAdminAdvertisementController = async (req, res, next) => {
         const updated = await updateAdminAdvertisement(adId, req.body || {}, req.files || {});
         invalidateCache('landing_advertisements*');
         return sendResponse(res, 200, 'Advertisement updated successfully', updated);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ----- Advertisement billing (admin revenue share) -----
+
+export const getAdminAdvertisementBillingController = async (req, res, next) => {
+    try {
+        const data = await getAdminAdBilling(req.query || {});
+        return sendResponse(res, 200, 'Advertisement billing fetched successfully', data);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const listRestaurantAdSettingsController = async (req, res, next) => {
+    try {
+        const data = await listRestaurantAdSettings(req.query || {});
+        return sendResponse(res, 200, 'Restaurant ad percentages fetched successfully', data);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const setRestaurantAdPercentageController = async (req, res, next) => {
+    try {
+        const data = await setRestaurantAdPercentage(
+            req.params.restaurantId,
+            req.body?.percentage ?? req.body?.adCommissionPercentage
+        );
+        return sendResponse(res, 200, 'Advertisement percentage updated', data);
     } catch (error) {
         next(error);
     }

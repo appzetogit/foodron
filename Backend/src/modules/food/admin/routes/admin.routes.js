@@ -171,13 +171,13 @@ router.get('/advertisements', checkPermission('food::promotions_management::adve
 router.post(
     '/advertisements',
     checkPermission('food::promotions_management::advertisement', 'create'),
-    upload.fields([{ name: 'image', maxCount: 1 }, { name: 'video', maxCount: 1 }]),
+    upload.fields([{ name: 'image', maxCount: 1 }]),
     advertisementController.createAdminAdvertisementController
 );
 router.patch(
     '/advertisements/:id',
     checkPermission('food::promotions_management::advertisement', 'edit'),
-    upload.fields([{ name: 'image', maxCount: 1 }, { name: 'video', maxCount: 1 }]),
+    upload.fields([{ name: 'image', maxCount: 1 }]),
     advertisementController.updateAdminAdvertisementController
 );
 router.get('/advertisement-requests', checkPermission('food::promotions_management::advertisement', 'view'), advertisementController.listAdminAdvertisementRequestsController);
@@ -188,6 +188,9 @@ router.patch(
 );
 router.patch('/advertisements/:id/priority', checkPermission('food::promotions_management::advertisement', 'edit'), advertisementController.updateAdminAdvertisementPriorityController);
 router.delete('/advertisements/:id', checkPermission('food::promotions_management::advertisement', 'delete'), advertisementController.deleteAdminAdvertisementController);
+router.get('/advertisement-billing', checkPermission('food::promotions_management::advertisement', 'view'), advertisementController.getAdminAdvertisementBillingController);
+router.get('/advertisement-billing/restaurants', checkPermission('food::promotions_management::advertisement', 'view'), advertisementController.listRestaurantAdSettingsController);
+router.patch('/advertisement-billing/restaurants/:restaurantId', checkPermission('food::promotions_management::advertisement', 'edit'), advertisementController.setRestaurantAdPercentageController);
 
 // ----- Feedback Experience (Admin) -----
 router.get('/feedback-experiences', checkPermission('food::report_management::customer_report::feedback_experience', 'view'), feedbackExperienceController.getFeedbackExperiences);

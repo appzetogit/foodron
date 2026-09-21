@@ -12,6 +12,7 @@ import { Card, CardContent } from "@food/components/ui/card"
 import { Button } from "@food/components/ui/button"
 import BottomNavOrders from "@food/components/restaurant/BottomNavOrders"
 import { restaurantAPI } from "@food/api"
+import AdChargesLedger from "@food/components/restaurant/AdChargesLedger"
 import { toast } from "sonner"
 
 export default function AdDetailsPage() {
@@ -86,7 +87,18 @@ export default function AdDetailsPage() {
                     <h2 className="text-base font-bold text-gray-900">
                       Ads ID #{adData.adsId || adData.id}
                     </h2>
-                    <span className="bg-red-50 text-red-700 text-xs font-medium px-3 py-1 rounded-full">
+                    <span
+                      className={`text-xs font-medium px-3 py-1 rounded-full ${
+                        {
+                          Approved: "bg-green-100 text-green-700",
+                          Running: "bg-green-100 text-green-700",
+                          Pending: "bg-amber-100 text-amber-700",
+                          Rejected: "bg-red-100 text-red-700",
+                          Paused: "bg-slate-200 text-slate-700",
+                          Expired: "bg-orange-100 text-orange-700",
+                        }[adData.status] || "bg-blue-100 text-blue-700"
+                      }`}
+                    >
                       {adData.status}
                     </span>
                   </div>
@@ -159,20 +171,44 @@ export default function AdDetailsPage() {
                     <p className="text-sm text-gray-600">{adData.pauseNote || "—"}</p>
                   </div>
 
-                  {(adData.imageUrl || adData.videoUrl) && (
+                  {adData.imageUrl && (
                     <div>
                       <h3 className="text-sm font-bold text-gray-900 mb-1.5">Media</h3>
                       {adData.imageUrl && (
                         <img src={adData.imageUrl} alt={adData.title} className="w-full rounded-lg object-cover max-h-56" />
-                      )}
-                      {adData.videoUrl && (
-                        <video src={adData.videoUrl} controls className="w-full rounded-lg mt-2 max-h-56" />
                       )}
                     </div>
                   )}
                 </CardContent>
               </Card>
             </motion.div>
+
+            <Card className="bg-white shadow-sm border border-gray-100">
+              <CardContent className="p-4 space-y-2">
+                <h3 className="text-sm font-bold text-gray-900">Payment</h3>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Status</span>
+                  <span className="font-medium text-gray-900">{adData.paymentStatus || "—"}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Rate</span>
+                  <span className="font-medium text-gray-900">
+                    {adData.billable && Number(adData.adCommissionPercentage) > 0
+                      ? `${adData.adCommissionPercentage}% of daily earning`
+                      : "Free"}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Charged so far</span>
+                  <span className="font-bold text-red-600">
+                    ₹{Number(adData.chargedTotal || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <span className="font-normal text-gray-500"> ({adData.chargedDays || 0} day{adData.chargedDays === 1 ? "" : "s"})</span>
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {adData.billable && <AdChargesLedger adId={adData.id} title="Day-wise charges for this ad" />}
 
             <Button
               onClick={() => navigate(`/food/restaurant/advertisements/${adData.id}/edit`)}
