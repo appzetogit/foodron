@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const foodUnder250BannerSchema = new mongoose.Schema(
+const foodUnder99BannerSchema = new mongoose.Schema(
     {
         imageUrl: {
             type: String,
@@ -34,12 +34,12 @@ const foodUnder250BannerSchema = new mongoose.Schema(
         }
     },
     {
-        collection: 'food_under250_banners',
+        collection: 'food_under99_banners',
         timestamps: true
     }
 );
 
-foodUnder250BannerSchema.index({ isActive: 1, sortOrder: 1 });
+foodUnder99BannerSchema.index({ isActive: 1, sortOrder: 1 });
 
-export const FoodUnder250Banner = mongoose.model('FoodUnder250Banner', foodUnder250BannerSchema, 'food_under250_banners');
+export const FoodUnder99Banner = mongoose.model('FoodUnder99Banner', foodUnder99BannerSchema, 'food_under99_banners');
 

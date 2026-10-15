@@ -5,8 +5,8 @@ export async function invalidateLandingHeroCache() {
     await invalidateCache('landing_hero*');
 }
 
-export async function invalidateLandingUnder250Cache() {
-    await invalidateCache('landing_under250*');
+export async function invalidateLandingUnder99Cache() {
+    await invalidateCache('landing_under99*');
 }
 
 export async function invalidateLandingExploreCache() {

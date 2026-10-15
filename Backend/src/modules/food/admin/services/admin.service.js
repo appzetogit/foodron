@@ -5585,7 +5585,7 @@ export async function approveRestaurant(id, performer = null) {
             const { invalidateCache } = await import('../../../../middleware/cache.js');
             await Promise.all([
                 invalidateCache('restaurants*'),
-                invalidateCache('restaurants_under_250*'),
+                invalidateCache('restaurants_under_99*'),
                 invalidateCache('restaurant_detail*'),
                 invalidateCache('food_search*'),
             ]);
@@ -5630,7 +5630,7 @@ export async function approveRestaurant(id, performer = null) {
             const { invalidateCache } = await import('../../../../middleware/cache.js');
             await Promise.all([
                 invalidateCache('restaurants*'),
-                invalidateCache('restaurants_under_250*'),
+                invalidateCache('restaurants_under_99*'),
                 invalidateCache('restaurant_detail*'),
                 invalidateCache('food_search*'),
             ]);

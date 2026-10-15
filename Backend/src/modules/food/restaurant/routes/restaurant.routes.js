@@ -5,7 +5,7 @@ import {
     saveOnboardingStepController,
     getOnboardingDraftController,
     listApprovedRestaurantsController,
-    listUnder250RestaurantsController,
+    listUnder99RestaurantsController,
     getApprovedRestaurantController,
     listPublicOffersController,
     getCurrentRestaurantController,
@@ -172,10 +172,10 @@ router.get('/restaurants', (req, res, next) => {
     if (req.query?.lat != null && req.query?.lng != null) return next();
     return cacheResponse(300, 'restaurants')(req, res, next);
 }, listApprovedRestaurantsController);
-router.get('/restaurants/under-250', (req, res, next) => {
+router.get('/restaurants/under-99', (req, res, next) => {
     if (req.query?.lat != null && req.query?.lng != null) return next();
-    return cacheResponse(300, 'restaurants_under_250')(req, res, next);
-}, listUnder250RestaurantsController);
+    return cacheResponse(300, 'restaurants_under_99')(req, res, next);
+}, listUnder99RestaurantsController);
 router.get('/restaurants/:id', cacheResponse(600, 'restaurant_detail'), getApprovedRestaurantController);
 router.get('/restaurants/:id/menu-discount', getPublicRestaurantMenuDiscountController);
 router.get('/restaurants/:id/menu', cacheResponse(600, 'restaurant_menu'), getPublicRestaurantMenuController);
