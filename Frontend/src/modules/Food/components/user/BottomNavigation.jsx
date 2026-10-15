@@ -18,7 +18,7 @@ export default function BottomNavigation() {
     userLocation?.area?.toLowerCase().replace(/\s/g, '').includes("vijaynagar")
 
   // Check active routes - support both /user/* and /* paths
-  const isUnder250 = pathname === "/food/under-250" || pathname.startsWith("/food/user/under-250")
+  const isUnder99 = pathname === "/food/under-99" || pathname.startsWith("/food/user/under-99")
   const isSharedFoodProfile =
     (pathname === "/profile" || pathname.startsWith("/profile/")) &&
     profileSource !== "quick"
@@ -28,14 +28,14 @@ export default function BottomNavigation() {
     isSharedFoodProfile
   const isOrders = pathname.startsWith("/food/user/orders")
   const isDelivery =
-    !isUnder250 &&
+    !isUnder99 &&
     !isProfile &&
     !isOrders &&
     (pathname === "/food" ||
       pathname === "/food/" ||
       pathname === "/food/user" ||
       (pathname.startsWith("/food/user") &&
-        !pathname.includes("/under-250") &&
+        !pathname.includes("/under-99") &&
         !pathname.includes("/orders") &&
         !pathname.includes("/profile")))
 
@@ -69,20 +69,20 @@ export default function BottomNavigation() {
         {/* Divider */}
         <div className="h-8 w-px bg-gray-300 dark:bg-gray-700" />
 
-        {/* Under 250 Tab */}
+        {/* Under 99 Tab */}
         {!isVijayNagar && (
           <Link
-            to="/food/user/under-250"
-            className={`flex flex-1 flex-col items-center gap-1.5 px-2 sm:px-3 py-2 transition-all duration-200 relative ${isUnder250
+            to="/food/user/under-99"
+            className={`flex flex-1 flex-col items-center gap-1.5 px-2 sm:px-3 py-2 transition-all duration-200 relative ${isUnder99
                 ? "text-primary-orange dark:text-primary-orange"
                 : "text-gray-600 dark:text-gray-400"
               }`}
           >
-            <Tag className={`h-5 w-5 ${isUnder250 ? "text-primary-orange dark:text-primary-orange fill-primary-orange dark:fill-primary-orange" : "text-gray-600 dark:text-gray-400"}`} strokeWidth={2} />
-            <span className={`text-xs sm:text-sm font-medium ${isUnder250 ? "text-primary-orange dark:text-primary-orange font-semibold" : "text-gray-600 dark:text-gray-400"}`}>
-              Under 250
+            <Tag className={`h-5 w-5 ${isUnder99 ? "text-primary-orange dark:text-primary-orange fill-primary-orange dark:fill-primary-orange" : "text-gray-600 dark:text-gray-400"}`} strokeWidth={2} />
+            <span className={`text-xs sm:text-sm font-medium ${isUnder99 ? "text-primary-orange dark:text-primary-orange font-semibold" : "text-gray-600 dark:text-gray-400"}`}>
+              Under 99
             </span>
-            {isUnder250 && (
+            {isUnder99 && (
               <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary-orange dark:bg-primary-orange rounded-b-full" />
             )}
           </Link>

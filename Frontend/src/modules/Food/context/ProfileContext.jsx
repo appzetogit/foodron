@@ -14,7 +14,7 @@ const debugError = (...args) => {}
 
 
 const ProfileContext = createContext(null)
-const USER_SESSION_PREFERENCE_KEYS = ["userVegMode", "food-under-250-filters", "activeAddressId", "deliveryAddressMode"]
+const USER_SESSION_PREFERENCE_KEYS = ["userVegMode", "food-under-99-filters", "activeAddressId", "deliveryAddressMode"]
 
 export function ProfileProvider({ children }) {
   const getAddressId = (address) => address?.id || address?._id || null

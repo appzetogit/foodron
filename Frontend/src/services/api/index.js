@@ -1867,12 +1867,12 @@ export const restaurantAPI = {
   /** Public: list approved restaurants for user app */
   getRestaurants: (params = {}, config = {}) =>
     getPublicRestaurantsOnce(params, config),
-  /** Public: restaurants with dishes priced at or below ₹250 (single batched query) */
-  getUnder250Restaurants: (params = {}, config = {}) =>
-    getPublicUnder250RestaurantsOnce(params, config),
-  /** @deprecated use getUnder250Restaurants */
-  getRestaurantsUnder250: (zoneId, config = {}) =>
-    getPublicUnder250RestaurantsOnce(
+  /** Public: restaurants with dishes priced at or below ₹99 (single batched query) */
+  getUnder99Restaurants: (params = {}, config = {}) =>
+    getPublicUnder99RestaurantsOnce(params, config),
+  /** @deprecated use getUnder99Restaurants */
+  getRestaurantsUnder99: (zoneId, config = {}) =>
+    getPublicUnder99RestaurantsOnce(
       zoneId ? { zoneId } : {},
       config,
     ),
@@ -2058,7 +2058,7 @@ const publicRestaurantMenuCache = createInFlightCache({ ttlMs: 60 * 1000 });
 const publicRestaurantOutletTimingsCache = createInFlightCache({ ttlMs: 60 * 1000 });
 const publicGenericGetCache = createInFlightCache({ ttlMs: 60 * 1000 });
 const publicMenusBatchCache = createInFlightCache({ ttlMs: 60 * 1000 });
-const publicUnder250RestaurantsCache = createInFlightCache({ ttlMs: 60 * 1000 });
+const publicUnder99RestaurantsCache = createInFlightCache({ ttlMs: 60 * 1000 });
 
 export const publicGetOnce = (url, config = {}) => {
   const safeUrl = typeof url === "string" ? url.trim() : "";
@@ -2111,7 +2111,7 @@ const getPublicRestaurantsOnce = (params = {}, config = {}) => {
   );
 };
 
-const getPublicUnder250RestaurantsOnce = (params = {}, config = {}) => {
+const getPublicUnder99RestaurantsOnce = (params = {}, config = {}) => {
   const { noCache, ...axiosConfig } = config || {};
   const normalizedParams = { ...(params || {}) };
   if (!normalizedParams.zoneId && typeof window !== "undefined") {
@@ -2121,7 +2121,7 @@ const getPublicUnder250RestaurantsOnce = (params = {}, config = {}) => {
     }
   }
   if (noCache) {
-    return apiClient.get("/food/restaurant/restaurants/under-250", {
+    return apiClient.get("/food/restaurant/restaurants/under-99", {
       params: normalizedParams,
       ...axiosConfig,
     });
@@ -2130,9 +2130,9 @@ const getPublicUnder250RestaurantsOnce = (params = {}, config = {}) => {
   if (keyParams && typeof keyParams === "object") {
     delete keyParams._ts;
   }
-  const key = `under-250:${stableStringify(keyParams)}`;
-  return publicUnder250RestaurantsCache.getOrCreate(key, () =>
-    apiClient.get("/food/restaurant/restaurants/under-250", {
+  const key = `under-99:${stableStringify(keyParams)}`;
+  return publicUnder99RestaurantsCache.getOrCreate(key, () =>
+    apiClient.get("/food/restaurant/restaurants/under-99", {
       params: normalizedParams,
       ...axiosConfig,
     }),

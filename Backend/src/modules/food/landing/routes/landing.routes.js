@@ -9,12 +9,12 @@ import {
     updateHeroBannerController
 } from '../controllers/heroBanner.controller.js';
 import {
-    listUnder250BannersController,
-    uploadUnder250BannersController,
-    deleteUnder250BannerController,
-    updateUnder250BannerOrderController,
-    toggleUnder250BannerStatusController
-} from '../controllers/under250Banner.controller.js';
+    listUnder99BannersController,
+    uploadUnder99BannersController,
+    deleteUnder99BannerController,
+    updateUnder99BannerOrderController,
+    toggleUnder99BannerStatusController
+} from '../controllers/under99Banner.controller.js';
 import {
     getAdminLandingSettingsController,
     updateAdminLandingSettingsController
@@ -29,7 +29,7 @@ import {
 } from '../controllers/exploreIcon.controller.js';
 import {
     getPublicHeroBannersController,
-    getPublicUnder250BannersController,
+    getPublicUnder99BannersController,
     getPublicExploreIconsController,
     getPublicGourmetController,
     getPublicLandingSettingsController,
@@ -100,32 +100,32 @@ router.patch(
     updateHeroBannerController
 );
 
-// Admin under 250 banners
-router.get('/hero-banners/under-250', ...adminLanding('view'), listUnder250BannersController);
+// Admin under 99 banners
+router.get('/hero-banners/under-99', ...adminLanding('view'), listUnder99BannersController);
 router.post(
-    '/hero-banners/under-250/multiple',
+    '/hero-banners/under-99/multiple',
     ...adminLanding('create'),
     upload.array('files'),
-    invalidateLandingCacheOnSuccess('landing_under250'),
-    uploadUnder250BannersController
+    invalidateLandingCacheOnSuccess('landing_under99'),
+    uploadUnder99BannersController
 );
 router.delete(
-    '/hero-banners/under-250/:id',
+    '/hero-banners/under-99/:id',
     ...adminLanding('delete'),
-    invalidateLandingCacheOnSuccess('landing_under250'),
-    deleteUnder250BannerController
+    invalidateLandingCacheOnSuccess('landing_under99'),
+    deleteUnder99BannerController
 );
 router.patch(
-    '/hero-banners/under-250/:id/order',
+    '/hero-banners/under-99/:id/order',
     ...adminLanding('edit'),
-    invalidateLandingCacheOnSuccess('landing_under250'),
-    updateUnder250BannerOrderController
+    invalidateLandingCacheOnSuccess('landing_under99'),
+    updateUnder99BannerOrderController
 );
 router.patch(
-    '/hero-banners/under-250/:id/status',
+    '/hero-banners/under-99/:id/status',
     ...adminLanding('edit'),
-    invalidateLandingCacheOnSuccess('landing_under250'),
-    toggleUnder250BannerStatusController
+    invalidateLandingCacheOnSuccess('landing_under99'),
+    toggleUnder99BannerStatusController
 );
 
 // Admin Explore More (icons)
@@ -192,7 +192,7 @@ router.patch(
 
 // Public landing endpoints (Food user app)
 router.get('/hero-banners/public', cacheResponse(300, 'landing_hero'), getPublicHeroBannersController);
-router.get('/hero-banners/under-250/public', cacheResponse(300, 'landing_under250'), getPublicUnder250BannersController);
+router.get('/hero-banners/under-99/public', cacheResponse(300, 'landing_under99'), getPublicUnder99BannersController);
 router.get('/explore-icons/public', cacheResponse(300, 'landing_explore'), getPublicExploreIconsController);
 router.get('/hero-banners/gourmet/public', cacheResponse(300, 'landing_gourmet'), getPublicGourmetController);
 router.get('/landing/settings/public', cacheResponse(300, 'landing_settings'), getPublicLandingSettingsController);

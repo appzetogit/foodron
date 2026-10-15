@@ -29,9 +29,9 @@ export default function PromoRow({ handleVegModeChange, navigate, isVegMode, tog
       subTextColor: 'rgba(255,255,255,0.80)',
     },
     {
-      id: 'under-250',
+      id: 'under-99',
       title: "UNDER",
-      value: "₹250",
+      value: "₹99",
       icon: pricePromoIcon,
       gradient: 'linear-gradient(145deg, #e65100, #f57c00)',
       shadowColor: 'rgba(230,81,0,0.35)',
@@ -74,7 +74,7 @@ export default function PromoRow({ handleVegModeChange, navigate, isVegMode, tog
           onClick={() => {
             if (promo.id === 'pure-veg') handleVegModeChange(!isVegMode);
             else if (promo.id === 'offers') navigate('/food/user/offers');
-            else if (promo.id === 'under-250') navigate('/food/user/under-250');
+            else if (promo.id === 'under-99') navigate('/food/user/under-99');
           }}
         >
           {/* Label Section */}
