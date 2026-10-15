@@ -125,7 +125,7 @@ export default function UserLayout({ children }) {
   // Note: Authentication checks and redirects are handled by ProtectedRoute components
   // UserLayout should not interfere with authentication redirects
 
-  // Show bottom navigation only on home page, under-250 page, and profile page
+  // Show bottom navigation only on home page, under-99 page, and profile page
   const path = location.pathname.startsWith("/food")
     ? location.pathname.substring(5) || "/"
     : location.pathname
@@ -137,8 +137,8 @@ export default function UserLayout({ children }) {
 
   const showBottomNav = normalizedPath === "/" ||
     normalizedPath === "/user" ||
-    normalizedPath === "/under-250" ||
-    normalizedPath === "/user/under-250" ||
+    normalizedPath === "/under-99" ||
+    normalizedPath === "/user/under-99" ||
     normalizedPath === "/orders" ||
     normalizedPath === "/user/orders" ||
     isProfileRoot ||

@@ -1,6 +1,6 @@
 import OptimizedImage from "@food/components/OptimizedImage";
 
-export default function Under250DesktopHero({
+export default function Under99DesktopHero({
   bannerImages,
   currentBannerIndex,
   onSelectBanner,
@@ -19,7 +19,7 @@ export default function Under250DesktopHero({
               Budget bites
             </p>
             <h1 className="mt-2 text-3xl font-black tracking-tight text-gray-900 dark:text-white lg:text-4xl">
-              Dishes under {rupeeSymbol}250
+              Dishes under {rupeeSymbol}99
             </h1>
             <p className="mt-3 max-w-md text-sm leading-relaxed text-gray-600 dark:text-gray-400 lg:text-base">
               Discover affordable meals from restaurants near you. Filter by category, delivery time, or sort by rating and distance.
@@ -38,7 +38,7 @@ export default function Under250DesktopHero({
               ) : activeBanner ? (
                 <OptimizedImage
                   src={activeBanner}
-                  alt="Under 250 banner"
+                  alt="Under 99 banner"
                   className="h-full w-full"
                   objectFit="cover"
                   priority
@@ -47,7 +47,7 @@ export default function Under250DesktopHero({
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-red-50 to-rose-100 dark:from-red-950 dark:to-rose-950">
                   <span className="text-sm font-semibold text-red-600 dark:text-red-300">
-                    Great deals under {rupeeSymbol}250
+                    Great deals under {rupeeSymbol}99
                   </span>
                 </div>
               )}
