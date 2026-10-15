@@ -13,7 +13,7 @@ function RedirectWithState({ to }) {
 
 // Home & Discovery
 const Home = lazy(() => import("../../pages/user/Home"))
-const Under250 = lazy(() => import("@food/pages/user/Under250"))
+const Under99 = lazy(() => import("@food/pages/user/Under99"))
 const Categories = lazy(() => import("@food/pages/user/Categories"))
 const CategoryPage = lazy(() => import("@food/pages/user/CategoryPage"))
 const Restaurants = lazy(() => import("@food/pages/user/restaurants/Restaurants"))
@@ -86,7 +86,7 @@ export default function UserRouter() {
           {/* Home & Discovery */}
           <Route path="" element={<Home />} />
           <Route path="quick" element={<Navigate to="/quick" replace />} />
-          <Route path="under-250" element={<Under250 />} />
+          <Route path="under-99" element={<Under99 />} />
           <Route path="categories" element={<Categories />} />
           <Route path="category/:category" element={<CategoryPage />} />
           <Route path="restaurants" element={<Restaurants />} />

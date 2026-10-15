@@ -10,7 +10,7 @@ import {
     serializeItemSlotTiming
 } from './itemSlotTiming.util.js';
 
-const MAX_UNDER_250_PRICE = 250;
+const MAX_UNDER_99_PRICE = 99;
 const MAX_RESTAURANTS = 1000;
 const MAX_FOOD_ITEMS = 10000;
 
@@ -38,10 +38,10 @@ const pickRestaurantImage = (restaurant = {}) => {
 };
 
 /**
- * Returns approved restaurants that have at least one dish priced at or below ₹250.
+ * Returns approved restaurants that have at least one dish priced at or below ₹99.
  * Uses two DB round-trips (restaurant list + batched food items) instead of N menu calls.
  */
-export async function listUnder250Restaurants(query = {}) {
+export async function listUnder99Restaurants(query = {}) {
     const { restaurants: approvedRestaurants = [] } = await listApprovedRestaurants({
         ...query,
         limit: MAX_RESTAURANTS,
@@ -123,7 +123,7 @@ export async function listUnder250Restaurants(query = {}) {
         }
 
         const displayPrice = getFoodDisplayPrice(food);
-        if (!Number.isFinite(displayPrice) || displayPrice <= 0 || displayPrice > MAX_UNDER_250_PRICE) {
+        if (!Number.isFinite(displayPrice) || displayPrice <= 0 || displayPrice > MAX_UNDER_99_PRICE) {
             continue;
         }
 

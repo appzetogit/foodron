@@ -95,7 +95,7 @@ export default function RestaurantItemDetailSheet({
     selectedItem.categoryName || selectedItem.category || selectedItem.sectionName || ""
 
   // Ensure we correctly grey out the item if the restaurant is offline,
-  // regardless of where this sheet was opened from (e.g. RecommendedSection, Under250).
+  // regardless of where this sheet was opened from (e.g. RecommendedSection, Under99).
   const availabilityStatus = restaurant ? getRestaurantAvailabilityStatus(restaurant) : { isOpen: true }
   const isRestaurantOffline = !availabilityStatus.isOpen
   const effectiveGrayscale = shouldShowGrayscale || isRestaurantOffline

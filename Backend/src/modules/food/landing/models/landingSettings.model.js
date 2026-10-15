@@ -16,7 +16,7 @@ const foodLandingSettingsSchema = new mongoose.Schema(
             type: Boolean,
             default: true
         },
-        showUnder250: {
+        showUnder99: {
             type: Boolean,
             default: true
         },
