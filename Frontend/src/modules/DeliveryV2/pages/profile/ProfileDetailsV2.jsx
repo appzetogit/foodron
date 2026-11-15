@@ -64,7 +64,9 @@ export const ProfileDetailsV2 = () => {
     const parseWalletBalance = (response) => {
       const data = response?.data
       const wallet = (data?.success && data?.data?.wallet) || data?.wallet || data?.data || data
-      const possibleBalance = wallet?.totalBalance || wallet?.balance || wallet?.pocketBalance || 0
+      // pocketBalance is the live, withdrawal-adjusted balance; totalBalance/balance are
+      // lifetime-earnings style fields that never decrease after a withdrawal.
+      const possibleBalance = wallet?.pocketBalance ?? wallet?.balance ?? wallet?.totalBalance ?? 0
       return Number(possibleBalance) || 0
     }
 

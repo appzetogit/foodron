@@ -177,9 +177,12 @@ const buildMessagePayload = (payload = {}, token) => {
         message.data = data;
     }
 
-    message.android = {
-        priority: 'high',
-        notification: {
+    message.android = { priority: 'high' };
+    // Actor-scoped alerts (new order / delivery task) must stay data-only on Android too:
+    // an android.notification block lets the OS auto-display + skip onMessageReceived while
+    // backgrounded, which is why the app's full-screen incoming-order overlay never opens.
+    if (!omitWebAutoDisplay) {
+        message.android.notification = {
             title: notification.title,
             body: notification.body,
             channel_id: 'default',
@@ -188,10 +191,10 @@ const buildMessagePayload = (payload = {}, token) => {
             default_light_settings: true,
             click_action: 'FLUTTER_NOTIFICATION_CLICK',
             actions: []
+        };
+        if (image) {
+            message.android.notification.image = image;
         }
-    };
-    if (image) {
-        message.android.notification.image = image;
     }
 
     message.webpush = {

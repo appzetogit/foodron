@@ -228,7 +228,7 @@ export function toOrderCreateDto(orderLike) {
     restaurantImage:
       o.restaurantImage || restaurantProfileImageUrl(restaurantRef) || undefined,
     items: slimItems(o.items),
-    pricing: slimPricing(o.pricing, role),
+    pricing: slimPricing(o.pricing),
     payment: slimPayment(o.payment),
     deliveryAddress: o.deliveryAddress || o.address,
     deliveryMode: o.deliveryMode,

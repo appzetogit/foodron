@@ -22,9 +22,11 @@ export const getDeliveryReferralStats = async (deliveryPartnerId) => {
     const totalReferralEarnings = bonusAgg?.[0] ? Number(bonusAgg[0].total) : 0;
 
     return {
+        referralCode: partner?.referralCode || String(partner?._id || ''),
         referralCount: Number(partner?.referralCount) || 0,
         totalReferralEarnings,
-        rewardAmount: Math.max(0, Number(settingsDoc?.delivery?.referrerReward) || 0)
+        rewardAmount: Math.max(0, Number(settingsDoc?.delivery?.referrerReward) || 0),
+        limit: Math.max(0, Number(settingsDoc?.delivery?.limit) || 0)
     };
 };
 

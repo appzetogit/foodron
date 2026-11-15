@@ -31,6 +31,7 @@ export const ProfileV2 = () => {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [referralReward, setReferralReward] = useState(0)
+  const [referralStats, setReferralStats] = useState(null)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [logoutSubmitting, setLogoutSubmitting] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -57,13 +58,16 @@ export const ProfileV2 = () => {
 
   useEffect(() => {
     deliveryAPI.getReferralStats().then((res) => {
-      const reward = res?.data?.data?.stats?.rewardAmount
-      setReferralReward(Number(reward) || 0)
+      const stats = res?.data?.data?.stats
+      setReferralReward(Number(stats?.rewardAmount) || 0)
+      setReferralStats(stats || null)
     }).catch(() => {})
   }, [])
 
-  const refId = profile?._id || profile?.id || profile?.referralCode || ""
+  const refId = referralStats?.referralCode || profile?.referralCode || profile?._id || profile?.id || ""
   const referralLink = refId ? `${window.location.origin}/food/delivery/signup?ref=${encodeURIComponent(String(refId))}` : ""
+  const referralLimit = Number(referralStats?.limit) || 0
+  const referralsLeft = referralLimit > 0 ? Math.max(0, referralLimit - (Number(referralStats?.referralCount) || 0)) : null
 
   const handleShareReferral = async () => {
     if (!referralLink) return
@@ -200,6 +204,9 @@ export const ProfileV2 = () => {
                 Share & Earn{referralReward > 0 ? ` ₹${referralReward}` : ""}
               </h3>
               <p className="text-gray-500 text-xs font-medium">Invite friends to join the delivery partner fleet.</p>
+              {referralsLeft !== null && (
+                <p className="text-gray-400 text-[11px] font-medium mt-0.5">{referralsLeft} referral{referralsLeft === 1 ? "" : "s"} left</p>
+              )}
             </div>
             <button
               onClick={handleShareReferral}
