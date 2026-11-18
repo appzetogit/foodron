@@ -7,6 +7,21 @@ import { FoodFeeSettings } from '../../admin/models/feeSettings.model.js';
 import { splitQuickDeliveryCharge } from './quick-eligibility.service.js';
 import { normalizeQuickDeliverySettings } from '../utils/quickDeliveryConstants.js';
 import { resolveRestaurantPhone } from '../../shared/restaurantContact.js';
+import { FoodAdmin } from '../../../../core/admin/admin.model.js';
+
+/** Broadcast a realtime event to every active admin's socket room (dashboard/orders alerts). */
+export async function broadcastToAdmins(event, payload = {}) {
+  try {
+    const io = getIO();
+    if (!io) return;
+    const admins = await FoodAdmin.find({ isActive: true }).select('_id').lean();
+    for (const admin of admins) {
+      io.to(rooms.admin(admin._id)).emit(event, payload);
+    }
+  } catch {
+    // Non-blocking
+  }
+}
 
 /** Actions that must be processed by the payment worker (wallet credits / refunds). */
 export const PAYMENT_QUEUE_ACTIONS = [
@@ -733,6 +748,12 @@ export async function notifyRestaurantNewOrder(orderDoc) {
         },
       );
 
+      await broadcastToAdmins("admin_new_order", {
+        audience: "admin",
+        orderId: payload.orderId,
+        orderMongoId: payload.orderMongoId,
+        restaurantName: orderDoc.restaurantName,
+      });
     }
 
     const isFoodQuick =
@@ -757,6 +778,21 @@ export async function notifyRestaurantNewOrder(orderDoc) {
       },
     );
 
+    const { notifyAdminsSafely } = await import(
+      '../../../../core/notifications/firebase.service.js'
+    );
+    await notifyAdminsSafely({
+      title: isFoodQuick ? "New Quick Delivery order" : "New order received",
+      body: `Order #${orderDoc.orderId || orderDoc.order_id || orderDoc._id} from ${orderDoc.restaurantName || "a restaurant"}.`,
+      data: {
+        type: "new_order",
+        audience: "admin",
+        orderId: orderDoc._id?.toString?.() || "",
+        orderMongoId: orderDoc._id?.toString?.() || "",
+        link: `/admin/food/orders/all`,
+        targetUrl: `/admin/food/orders/all`,
+      },
+    });
   } catch {
     // Do not block order/payment flow if notification fails.
   }

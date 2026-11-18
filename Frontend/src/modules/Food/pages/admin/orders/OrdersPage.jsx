@@ -12,6 +12,7 @@ import ViewOrderDialog from "@food/components/admin/orders/ViewOrderDialog"
 import SettingsDialog from "@food/components/admin/orders/SettingsDialog"
 import RefundModal from "@food/components/admin/orders/RefundModal"
 import RejectOrderModal from "@food/components/admin/orders/RejectOrderModal"
+import DeleteOrderModal from "@food/components/admin/orders/DeleteOrderModal"
 import { useOrdersManagement } from "@food/components/admin/orders/useOrdersManagement"
 import { Loader2 } from "lucide-react"
 import { OrdersDashboardSkeleton } from "@food/components/ui/loading-skeletons"
@@ -55,6 +56,8 @@ export default function OrdersPage({ statusKey = "all" }) {
   const [selectedOrderForRefund, setSelectedOrderForRefund] = useState(null)
   const [rejectModalOpen, setRejectModalOpen] = useState(false)
   const [selectedOrderForReject, setSelectedOrderForReject] = useState(null)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [selectedOrderForDelete, setSelectedOrderForDelete] = useState(null)
   const showLoadingSkeleton = useDelayedLoading(isLoading, { delay: 120, minDuration: 360 })
   const seenOrderIdsRef = useRef(new Set())
   const isFirstLoadRef = useRef(true)
@@ -873,25 +876,29 @@ export default function OrdersPage({ statusKey = "all" }) {
     }
   }
 
-  const handleDeleteOrder = async (order) => {
+  const handleDeleteOrder = (order) => {
+    setSelectedOrderForDelete(order)
+    setDeleteModalOpen(true)
+  }
+
+  const confirmDeleteOrder = async (order) => {
     const orderIdToUse = order.id || order._id || order.orderId
     if (!orderIdToUse) {
       toast.error("Order ID not found")
+      setDeleteModalOpen(false)
       return
     }
-
-    const shouldDelete = confirm(
-      `Delete order ${order.orderId} permanently?\n\nThis will remove it from customer and delivery apps as well.`,
-    )
-
-    if (!shouldDelete) return
 
     try {
       setDeletingOrderId(order.id || order.orderId)
       const response = await adminAPI.deleteOrder(orderIdToUse)
       if (response.data?.success) {
         toast.success(response.data?.message || `Order ${order.orderId} deleted`)
-        await fetchOrders({ silent: true, withRingCheck: false })
+        setOrders((prev) =>
+          (Array.isArray(prev) ? prev : []).filter(
+            (o) => (o.id || o._id || o.orderId) !== orderIdToUse,
+          ),
+        )
       } else {
         toast.error(response.data?.message || "Failed to delete order")
       }
@@ -900,6 +907,8 @@ export default function OrdersPage({ statusKey = "all" }) {
       toast.error(error.response?.data?.message || "Failed to delete order")
     } finally {
       setDeletingOrderId(null)
+      setDeleteModalOpen(false)
+      setSelectedOrderForDelete(null)
     }
   }
 
@@ -1103,7 +1112,14 @@ export default function OrdersPage({ statusKey = "all" }) {
         onConfirm={confirmRejectOrder}
         isProcessing={processingActionOrderId !== null}
       />
-      <OrdersTable 
+      <DeleteOrderModal
+        isOpen={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        order={selectedOrderForDelete}
+        onConfirm={confirmDeleteOrder}
+        isProcessing={deletingOrderId !== null}
+      />
+      <OrdersTable
         orders={filteredOrders} 
         visibleColumns={visibleColumns}
         onViewOrder={handleViewOrder}
