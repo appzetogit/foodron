@@ -487,6 +487,21 @@ export default function OrdersTable({
                           ) : null}
                         </>
                       )}
+
+                      {onDeleteOrder && (
+                        <button
+                          onClick={() => onDeleteOrder(order)}
+                          disabled={deletingOrderId === (order.id || order.orderId)}
+                          className="p-1.5 rounded text-red-600 hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                          title="Delete Order"
+                        >
+                          {deletingOrderId === (order.id || order.orderId) ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
                     </div>
                   </td>
                 )}
