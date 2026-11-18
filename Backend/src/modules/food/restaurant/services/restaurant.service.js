@@ -13,7 +13,7 @@ import {
     notifyOwnerSafely
 } from '../../../../core/notifications/firebase.service.js';
 import { isPointInPolygon } from '../../../../utils/geo.js';
-import { ensureDailyPassEligibility, activateDailyPass, checkRestaurantEligibilityReadOnly } from '../../subscriptions/services/wallet.service.js';
+import { ensureDailyPassEligibility, activateDailyPass } from '../../subscriptions/services/wallet.service.js';
 import { logger } from '../../../../utils/logger.js';
 import { getRoadDistancesToDestination } from '../../../../services/roadDistance.service.js';
 import { parseGeoPoint } from '../../shared/geo.utils.js';
@@ -1674,24 +1674,9 @@ export const getCurrentRestaurantProfile = async (restaurantId) => {
         doc.wasEverApproved = true;
     }
 
-    // Determine derived acceptsOrders status using the pure read-only check
-    let isAcceptingOrders = doc.isAcceptingOrders !== false;
-    try {
-        const eligibility = await checkRestaurantEligibilityReadOnly(restaurantId, 'RESTAURANT');
-        if (isAcceptingOrders !== eligibility.shouldAppearOnline) {
-            isAcceptingOrders = eligibility.shouldAppearOnline;
-
-            // Self-heal the database state asynchronously (non-blocking)
-            FoodRestaurant.updateOne(
-                { _id: restaurantId },
-                { $set: { isAcceptingOrders } }
-            ).catch(err => {
-                logger.error(`[SELF-HEAL] Failed to update isAcceptingOrders to ${isAcceptingOrders} for restaurant ${restaurantId}: ${err.message}`);
-            });
-        }
-    } catch (err) {
-        logger.error(`[PROFILE-HYDRATION] Error validating accepts orders status: ${err.message}`);
-    }
+    // Commission-based platform: restaurant's own isAcceptingOrders toggle is authoritative.
+    // No subscription eligibility check overrides it.
+    const isAcceptingOrders = doc.isAcceptingOrders !== false;
 
     return toRestaurantProfile({
         ...doc,
