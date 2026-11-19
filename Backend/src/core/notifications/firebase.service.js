@@ -189,8 +189,7 @@ const buildMessagePayload = (payload = {}, token) => {
             sound: 'default',
             default_vibrate_timings: true,
             default_light_settings: true,
-            click_action: 'FLUTTER_NOTIFICATION_CLICK',
-            actions: []
+            click_action: 'FLUTTER_NOTIFICATION_CLICK'
         };
         if (image) {
             message.android.notification.image = image;
