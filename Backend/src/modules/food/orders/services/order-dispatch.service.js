@@ -648,10 +648,9 @@ async function runDispatchHunt({
 async function tryAutoAssignForwardOrder(orderId, options = {}) {
   const attempt = options.attempt || 1;
   const lockTimeout = 55000;
-  // Never auto-assign while orderStatus is scheduled (hold until activation → placed → restaurant accept).
+  // Only assignable once the restaurant has accepted the order — never while still
+  // "created"/"placed" (unconfirmed), or riders get offered orders the restaurant hasn't seen yet.
   const activeOrderStatuses = [
-    "created",
-    "placed",
     "confirmed",
     "preparing",
     "ready_for_pickup",
