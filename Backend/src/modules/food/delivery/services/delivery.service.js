@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { FoodDeliveryPartner } from '../models/deliveryPartner.model.js';
+import { FoodServiceArea } from '../../admin/models/serviceArea.model.js';
 import { FoodDeliveryCashDeposit } from '../models/foodDeliveryCashDeposit.model.js';
 import { DeliverySupportTicket } from '../models/supportTicket.model.js';
 import { DeliveryBonusTransaction } from '../../admin/models/deliveryBonusTransaction.model.js';
@@ -136,10 +137,15 @@ export const registerDeliveryPartner = async (payload, files, options = {}) => {
     const adminCreated = Boolean(options?.adminCreated);
     const {
         name, phone, email, countryCode, address, city, state,
+        zoneId, serviceAreaId,
         vehicleType, vehicleName, vehicleNumber, drivingLicenseNumber, panNumber, aadharNumber,
         fcmToken, platform, razorpayOrderId, razorpayPaymentId, razorpaySignature
     } = payload;
     const requestedType = String(payload?.submissionType || '').trim().toLowerCase();
+
+    if (!zoneId) {
+        throw new ValidationError('Zone is required');
+    }
 
     let partner;
     let claimedReapply = false;
@@ -295,6 +301,22 @@ export const registerDeliveryPartner = async (payload, files, options = {}) => {
         );
     }
 
+    // Data-filtering tags only (chosen at onboarding) — never used for order dispatch,
+    // which stays based on the partner's live location.
+    const normalizedZoneId = zoneId && mongoose.Types.ObjectId.isValid(String(zoneId))
+        ? new mongoose.Types.ObjectId(String(zoneId))
+        : undefined;
+    let normalizedServiceAreaId;
+    if (serviceAreaId && mongoose.Types.ObjectId.isValid(String(serviceAreaId))) {
+        if (normalizedZoneId) {
+            const serviceArea = await FoodServiceArea.findOne({ _id: serviceAreaId, zoneId: normalizedZoneId }).select('_id').lean();
+            if (!serviceArea) {
+                throw new ValidationError('Selected service area does not belong to the selected zone');
+            }
+        }
+        normalizedServiceAreaId = new mongoose.Types.ObjectId(String(serviceAreaId));
+    }
+
     const partnerData = {
         name,
         phone,
@@ -303,6 +325,8 @@ export const registerDeliveryPartner = async (payload, files, options = {}) => {
         address,
         city,
         state,
+        zoneId: normalizedZoneId,
+        serviceAreaId: normalizedServiceAreaId,
         vehicleType,
         vehicleName,
         vehicleNumber,

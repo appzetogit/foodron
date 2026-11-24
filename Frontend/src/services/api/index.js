@@ -866,6 +866,17 @@ export const adminAPI = {
       .finally(() => {
         adminZonesListCache.clear();
       }),
+  /** List service areas. Query: zoneId?, isActive?, search? — sub-polygons inside a zone, data-filtering only. */
+  getServiceAreas: (params = {}) =>
+    apiClient.get("/food/admin/service-areas", { params, contextModule: "admin" }),
+  getServiceAreaById: (id) =>
+    apiClient.get(`/food/admin/service-areas/${id}`, { contextModule: "admin" }),
+  createServiceArea: (body) =>
+    apiClient.post("/food/admin/service-areas", body ?? {}, { contextModule: "admin" }),
+  updateServiceArea: (id, body) =>
+    apiClient.patch(`/food/admin/service-areas/${id}`, body ?? {}, { contextModule: "admin" }),
+  deleteServiceArea: (id) =>
+    apiClient.delete(`/food/admin/service-areas/${id}`, { contextModule: "admin" }),
 
   /** Feedback Experience (admin) */
   getFeedbackExperiences: (params = {}) =>
@@ -3154,6 +3165,9 @@ export const zoneAPI = {
   /** Public: list active zones (for onboarding dropdowns). */
   getPublicZones: (params = {}, config = {}) =>
     apiClient.get("/food/zones/public", { params: params ?? {}, ...config }),
+  /** Public: list active service areas inside a zone (for onboarding dropdowns). */
+  getPublicServiceAreas: (zoneId, config = {}) =>
+    apiClient.get(`/food/zones/${String(zoneId)}/service-areas/public`, config ?? {}),
 };
 export const uploadAPI = {
   /**

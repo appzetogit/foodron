@@ -502,7 +502,14 @@ export const ProfileDetailsV2 = () => {
         <div className="text-center pt-6">
            <h2 className="text-2xl font-black text-gray-900 leading-none">{profile?.name}</h2>
            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-2 mb-4">Delivery Partner • {profile?.location?.city}</p>
-           
+           {(profile?.zoneName || profile?.serviceAreaName) && (
+             <p className="text-[11px] font-semibold text-gray-500 -mt-3 mb-4">
+               {profile?.zoneName && <>Zone: {profile.zoneName}</>}
+               {profile?.zoneName && profile?.serviceAreaName && " · "}
+               {profile?.serviceAreaName && <>Service Area: {profile.serviceAreaName}</>}
+             </p>
+           )}
+
            <div className="flex items-center justify-center gap-2">
               <div className="bg-[#10B981]/10 text-[#10B981] px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest border border-[#10B981]/20 flex items-center gap-2">
                  <CheckCircle className="w-4 h-4" /> {profile?.status}

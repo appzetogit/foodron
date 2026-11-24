@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
-import { MapPin, Plus, Search, Edit, Trash2, Eye, Map, Bike } from "lucide-react"
+import { MapPin, Plus, Search, Edit, Trash2, Eye, Map, Bike, Layers } from "lucide-react"
 import { adminAPI } from "@food/api"
 import { useAuth } from "@core/context/AuthContext"
 import { getCurrentUser } from "@food/utils/auth"
@@ -206,6 +206,13 @@ export default function ZoneSetup() {
                     <p className="text-sm text-slate-600">{zone.serviceLocation || "N/A"}</p>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => navigate(`/admin/food/zone-setup/${zone._id || zone.id}/service-areas`)}
+                      className="p-2 text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                      title="Service Areas"
+                    >
+                      <Layers className="w-4 h-4" />
+                    </button>
                     <button
                       onClick={() => navigate(`/admin/food/zone-setup/view/${zone._id || zone.id}`)}
                       className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"

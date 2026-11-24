@@ -40,6 +40,20 @@ const deliveryPartnerSchema = new mongoose.Schema(
         state: {
             type: String
         },
+        /**
+         * Data-filtering tags only (chosen at onboarding). Does NOT change dispatch —
+         * a driver still receives orders for whichever zone their live location is in.
+         */
+        zoneId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'FoodZone',
+            index: true
+        },
+        serviceAreaId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'FoodServiceArea',
+            index: true
+        },
         vehicleType: {
             type: String
         },

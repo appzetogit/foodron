@@ -182,6 +182,8 @@ export default function AddRestaurant() {
   const [formErrors, setFormErrors] = useState({})
   const [zones, setZones] = useState([])
   const [zonesLoading, setZonesLoading] = useState(false)
+  const [serviceAreas, setServiceAreas] = useState([])
+  const [serviceAreasLoading, setServiceAreasLoading] = useState(false)
   const [isHydrated, setIsHydrated] = useState(false)
 
   // Step 1: Basic Info
@@ -193,6 +195,7 @@ export default function AddRestaurant() {
     ownerPhone: "",
     primaryContactNumber: "",
     zoneId: "",
+    serviceAreaId: "",
     location: {
       addressLine1: "",
       addressLine2: "",
@@ -446,6 +449,7 @@ export default function AddRestaurant() {
     if (!step1.primaryContactNumber?.trim()) errors.push("Primary contact number is required")
     if (step1.primaryContactNumber?.trim() && !PHONE_REGEX.test(step1.primaryContactNumber.trim())) errors.push("Primary contact number must be 10 digits")
     if (!step1.zoneId?.trim()) errors.push("Service zone is required")
+    if (!step1.serviceAreaId?.trim()) errors.push("Service area is required")
     if (!step1.location?.area?.trim()) errors.push("Area/Sector/Locality is required")
     if (!step1.location?.city?.trim()) errors.push("City is required")
     return errors
@@ -622,6 +626,7 @@ export default function AddRestaurant() {
         ownerPhone: step1.ownerPhone,
         primaryContactNumber: step1.primaryContactNumber,
         zoneId: step1.zoneId,
+        serviceAreaId: step1.serviceAreaId,
         location: step1.location,
         // Step 2
         menuImages: menuImagesData,
@@ -710,6 +715,31 @@ export default function AddRestaurant() {
       cancelled = true
     }
   }, [step])
+
+  // Service areas belong to one zone — refetch whenever the selected zone changes.
+  useEffect(() => {
+    if (step !== 1 || !step1.zoneId) {
+      setServiceAreas([])
+      return
+    }
+    let cancelled = false
+    setServiceAreasLoading(true)
+    zoneAPI
+      .getPublicServiceAreas(step1.zoneId)
+      .then((res) => {
+        const list = res?.data?.data?.serviceAreas || []
+        if (!cancelled) setServiceAreas(Array.isArray(list) ? list : [])
+      })
+      .catch(() => {
+        if (!cancelled) setServiceAreas([])
+      })
+      .finally(() => {
+        if (!cancelled) setServiceAreasLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [step, step1.zoneId])
 
   // Initialize Google Places Autocomplete for Step 1 location search.
   useEffect(() => {
@@ -1057,7 +1087,7 @@ export default function AddRestaurant() {
           <Label className="text-xs text-gray-700">Service zone*</Label>
           <select
             value={step1.zoneId || ""}
-            onChange={(e) => setStep1({ ...step1, zoneId: e.target.value })}
+            onChange={(e) => setStep1({ ...step1, zoneId: e.target.value, serviceAreaId: "" })}
             className="mt-1 w-full h-9 rounded-md border border-input bg-white px-3 text-sm"
             disabled={zonesLoading}
           >
@@ -1074,6 +1104,34 @@ export default function AddRestaurant() {
           </select>
           <p className="text-[11px] text-gray-500 mt-1">
             Choose the service zone where your restaurant will be available.
+          </p>
+        </div>
+        <div>
+          <Label className="text-xs text-gray-700">Service area*</Label>
+          <select
+            value={step1.serviceAreaId || ""}
+            onChange={(e) => setStep1({ ...step1, serviceAreaId: e.target.value })}
+            className="mt-1 w-full h-9 rounded-md border border-input bg-white px-3 text-sm"
+            disabled={serviceAreasLoading || !step1.zoneId}
+          >
+            <option value="">
+              {!step1.zoneId
+                ? "Select a zone first"
+                : serviceAreasLoading
+                  ? "Loading service areas..."
+                  : "Select a service area"}
+            </option>
+            {serviceAreas.map((s) => {
+              const id = String(s?._id || s?.id || "")
+              return (
+                <option key={id} value={id}>
+                  {s?.name || id}
+                </option>
+              )
+            })}
+          </select>
+          <p className="text-[11px] text-gray-500 mt-1">
+            Used only to filter/report data by sub-area inside the zone — the restaurant's pin must fall inside it.
           </p>
         </div>
         <div>

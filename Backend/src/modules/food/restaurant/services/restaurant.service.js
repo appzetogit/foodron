@@ -7,6 +7,7 @@ import { uploadImageBuffer } from '../../../../services/upload.service.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import mongoose from 'mongoose';
 import { FoodZone } from '../../admin/models/zone.model.js';
+import { FoodServiceArea } from '../../admin/models/serviceArea.model.js';
 import { FoodOffer } from '../../admin/models/offer.model.js';
 import {
     notifyAdminsSafely,
@@ -342,6 +343,8 @@ const toRestaurantProfile = (doc) => {
         pureVegRestaurant: Boolean(doc.pureVegRestaurant),
         zoneId: doc.zoneId ? String(doc.zoneId?._id || doc.zoneId) : '',
         zoneName: doc.zoneId?.name || doc.zoneId?.zoneName || doc.zoneId?.serviceLocation || '',
+        serviceAreaId: doc.serviceAreaId ? String(doc.serviceAreaId?._id || doc.serviceAreaId) : '',
+        serviceAreaName: doc.serviceAreaId?.name || '',
         profileImage: doc.profileImage ? { url: doc.profileImage } : null,
         menuImages,
         coverImages,
@@ -908,7 +911,8 @@ const buildStep1Data = (payload) => {
         formattedAddress,
         latitude,
         longitude,
-        zoneId
+        zoneId,
+        serviceAreaId
     } = payload;
 
     if (!ownerPhone) {
@@ -951,6 +955,10 @@ const buildStep1Data = (payload) => {
         pureVegRestaurant,
         zoneId: mongoose.Types.ObjectId.isValid(String(zoneId).trim())
             ? new mongoose.Types.ObjectId(String(zoneId).trim())
+            : undefined,
+        // Data-filtering tag only — never affects the zone-based operational flow.
+        serviceAreaId: serviceAreaId && mongoose.Types.ObjectId.isValid(String(serviceAreaId).trim())
+            ? new mongoose.Types.ObjectId(String(serviceAreaId).trim())
             : undefined,
         location: {
             type: 'Point',
@@ -1025,6 +1033,18 @@ export const saveOnboardingStep = async (stepNum, payload, files) => {
         const lngNum = step1Data.location.longitude;
         if (!isPointInPolygon(latNum, lngNum, zone.coordinates)) {
             throw new ValidationError('Selected address is outside the selected zone');
+        }
+        if (step1Data.serviceAreaId) {
+            const serviceArea = await FoodServiceArea.findOne({
+                _id: step1Data.serviceAreaId,
+                zoneId: step1Data.zoneId
+            }).lean();
+            if (!serviceArea) {
+                throw new ValidationError('Selected service area does not belong to the selected zone');
+            }
+            if (!isPointInPolygon(latNum, lngNum, serviceArea.coordinates)) {
+                throw new ValidationError('Selected address is outside the selected service area');
+            }
         }
 
         const restaurantData = {
@@ -1176,6 +1196,7 @@ export const registerRestaurant = async (payload, files, authUserId) => {
         latitude,
         longitude,
         zoneId,
+        serviceAreaId,
         cuisines,
         openingTime,
         closingTime,
@@ -1314,6 +1335,18 @@ export const registerRestaurant = async (payload, files, authUserId) => {
             throw new ValidationError('Selected address is outside the selected zone');
         }
 
+        let resolvedServiceAreaId;
+        if (serviceAreaId) {
+            const serviceArea = await FoodServiceArea.findOne({ _id: serviceAreaId, zoneId }).lean();
+            if (!serviceArea) {
+                throw new ValidationError('Selected service area does not belong to the selected zone');
+            }
+            if (!isPointInPolygon(latNum, lngNum, serviceArea.coordinates)) {
+                throw new ValidationError('Selected address is outside the selected service area');
+            }
+            resolvedServiceAreaId = serviceArea._id;
+        }
+
         const restaurantData = {
             restaurantName,
             restaurantNameNormalized,
@@ -1329,6 +1362,7 @@ export const registerRestaurant = async (payload, files, authUserId) => {
             zoneId: zoneId && mongoose.Types.ObjectId.isValid(String(zoneId).trim())
                 ? new mongoose.Types.ObjectId(String(zoneId).trim())
                 : undefined,
+            serviceAreaId: resolvedServiceAreaId,
             location: {
                 type: 'Point',
                 coordinates: latNum !== null && lngNum !== null ? [lngNum, latNum] : undefined,
@@ -1623,6 +1657,7 @@ export const getCurrentRestaurantProfile = async (restaurantId) => {
                 'upiQrImage',
                 'pureVegRestaurant',
                 'zoneId',
+                'serviceAreaId',
                 'profileImage',
                 'coverImages',
                 'menuImages',
@@ -1663,6 +1698,7 @@ export const getCurrentRestaurantProfile = async (restaurantId) => {
             ].join(' ')
         )
         .populate('zoneId', 'name zoneName serviceLocation')
+        .populate('serviceAreaId', 'name')
         .lean();
     if (!doc) return null;
 
@@ -1930,6 +1966,13 @@ export const updateRestaurantProfile = async (restaurantId, body = {}) => {
             : undefined;
     }
 
+    if (body.serviceAreaId !== undefined) {
+        const serviceAreaId = String(body.serviceAreaId || '').trim();
+        update.serviceAreaId = serviceAreaId && mongoose.Types.ObjectId.isValid(serviceAreaId)
+            ? new mongoose.Types.ObjectId(serviceAreaId)
+            : undefined;
+    }
+
     // Bank + UPI fields (Explore -> Update Bank Details page)
     if (body.accountHolderName !== undefined) {
         update.accountHolderName = String(body.accountHolderName || '').trim();
@@ -2015,6 +2058,17 @@ export const updateRestaurantProfile = async (restaurantId, body = {}) => {
 
         if (!isPointInPolygon(lat, lng, zone.coordinates)) {
             throw new ValidationError('Selected address is outside the selected zone');
+        }
+
+        const targetServiceAreaId = update.serviceAreaId !== undefined ? update.serviceAreaId : currentRestaurant.serviceAreaId;
+        if (targetServiceAreaId) {
+            const serviceArea = await FoodServiceArea.findOne({ _id: targetServiceAreaId, zoneId: targetZoneId }).lean();
+            if (!serviceArea) {
+                throw new ValidationError('Selected service area does not belong to the selected zone');
+            }
+            if (!isPointInPolygon(lat, lng, serviceArea.coordinates)) {
+                throw new ValidationError('Selected address is outside the selected service area');
+            }
         }
 
         update.location = {

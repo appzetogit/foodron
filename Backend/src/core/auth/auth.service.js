@@ -970,7 +970,10 @@ export const getProfile = async (userId, role) => {
       }
       break;
     case ROLES.DELIVERY_PARTNER: {
-      const partner = await FoodDeliveryPartner.findById(id).lean();
+      const partner = await FoodDeliveryPartner.findById(id)
+        .populate('zoneId', 'name zoneName')
+        .populate('serviceAreaId', 'name')
+        .lean();
       if (!partner) break;
       const deliveryId = partner._id
         ? `DP-${partner._id.toString().slice(-8).toUpperCase()}`
@@ -989,6 +992,10 @@ export const getProfile = async (userId, role) => {
 
       profile = {
         ...partner,
+        zoneId: partner.zoneId?._id || partner.zoneId || null,
+        zoneName: partner.zoneId?.name || partner.zoneId?.zoneName || '',
+        serviceAreaId: partner.serviceAreaId?._id || partner.serviceAreaId || null,
+        serviceAreaName: partner.serviceAreaId?.name || '',
         email: partner.email || null,
         deliveryId,
         availabilityStatus: partner.availabilityStatus || 'offline',

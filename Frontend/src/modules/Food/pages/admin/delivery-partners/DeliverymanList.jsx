@@ -948,6 +948,18 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                           <p className="text-sm text-slate-900 mt-1">{viewDetails.location.state}</p>
                         </div>
                       )}
+                      {viewDetails.zone && (
+                        <div>
+                          <label className="text-xs font-semibold text-slate-500 uppercase">Zone</label>
+                          <p className="text-sm text-slate-900 mt-1">{viewDetails.zone}</p>
+                        </div>
+                      )}
+                      {viewDetails.serviceAreaName && (
+                        <div>
+                          <label className="text-xs font-semibold text-slate-500 uppercase">Service Area</label>
+                          <p className="text-sm text-slate-900 mt-1">{viewDetails.serviceAreaName}</p>
+                        </div>
+                      )}
                       {viewDetails.location.zipCode && (
                         <div>
                           <label className="text-xs font-semibold text-slate-500 uppercase">Zip Code</label>

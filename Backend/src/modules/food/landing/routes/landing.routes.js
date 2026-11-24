@@ -35,7 +35,7 @@ import {
     getPublicLandingSettingsController,
     getPublicAdvertisementsController
 } from '../controllers/publicLanding.controller.js';
-import { detectZonePublicController, listZonesPublicController, listZonesNearbyPublicController } from '../controllers/zonePublic.controller.js';
+import { detectZonePublicController, listZonesPublicController, listZonesNearbyPublicController, listServiceAreasPublicController } from '../controllers/zonePublic.controller.js';
 import { getPublicEnvController } from '../controllers/publicEnv.controller.js';
 import { getPublicFeeSettingsController } from '../controllers/publicFeeSettings.controller.js';
 import {
@@ -200,6 +200,7 @@ router.get('/advertisements/public', cacheResponse(300, 'landing_advertisements'
 router.get('/zones/detect', detectZonePublicController);
 router.get('/zones/nearby', listZonesNearbyPublicController);
 router.get('/zones/public', cacheResponse(600, 'landing_zones'), listZonesPublicController);
+router.get('/zones/:zoneId/service-areas/public', cacheResponse(600, 'landing_service_areas'), listServiceAreasPublicController);
 router.get('/public/env', getPublicEnvController);
 router.get('/fee-settings/public', cacheResponse(60, 'fee_settings'), getPublicFeeSettingsController);
 

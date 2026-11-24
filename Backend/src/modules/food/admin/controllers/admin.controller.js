@@ -1675,6 +1675,67 @@ export async function deleteZone(req, res, next) {
     }
 }
 
+// ----- Service Areas -----
+export async function getServiceAreas(req, res, next) {
+    try {
+        const data = await adminService.getServiceAreas(req.query);
+        res.status(200).json({ success: true, message: 'Service areas fetched successfully', data });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function getServiceAreaById(req, res, next) {
+    try {
+        const serviceArea = await adminService.getServiceAreaById(req.params.id);
+        if (!serviceArea) {
+            return res.status(404).json({ success: false, message: 'Service area not found' });
+        }
+        res.status(200).json({ success: true, message: 'Service area fetched successfully', data: { serviceArea } });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function createServiceArea(req, res, next) {
+    try {
+        const result = await adminService.createServiceArea(req.body || {});
+        if (result.error) {
+            return res.status(400).json({ success: false, message: result.error });
+        }
+        res.status(201).json({ success: true, message: 'Service area created successfully', data: result });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function updateServiceArea(req, res, next) {
+    try {
+        const result = await adminService.updateServiceArea(req.params.id, req.body || {});
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Service area not found' });
+        }
+        if (result.error) {
+            return res.status(400).json({ success: false, message: result.error });
+        }
+        res.status(200).json({ success: true, message: 'Service area updated successfully', data: result });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function deleteServiceArea(req, res, next) {
+    try {
+        const result = await adminService.deleteServiceArea(req.params.id);
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Service area not found' });
+        }
+        res.status(200).json({ success: true, message: 'Service area deleted successfully', data: result });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export async function processRefund(req, res, next) {
     try {
         const { orderId } = req.params;

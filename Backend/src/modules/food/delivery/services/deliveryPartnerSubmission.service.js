@@ -35,6 +35,8 @@ export const buildPartnerOnboardingSnapshot = (partner = {}) => {
         address: partner.address || '',
         city: partner.city || '',
         state: partner.state || '',
+        zoneId: partner.zoneId || null,
+        serviceAreaId: partner.serviceAreaId || null,
         vehicleType: partner.vehicleType || '',
         vehicleName: partner.vehicleName || '',
         vehicleNumber: partner.vehicleNumber || '',

@@ -8,6 +8,7 @@ import { FoodRestaurantWallet, ensureRestaurantWallet } from '../../restaurant/m
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
 import { DeliverySupportTicket } from '../../delivery/models/supportTicket.model.js';
 import { FoodZone } from '../models/zone.model.js';
+import { FoodServiceArea } from '../models/serviceArea.model.js';
 import { FoodCategory } from '../models/category.model.js';
 import { FoodItem } from '../models/food.model.js';
 import { FoodOffer } from '../models/offer.model.js';
@@ -449,13 +450,20 @@ export async function getRestaurants(query) {
     if (status && ['pending', 'approved', 'rejected'].includes(status)) {
         filter.status = status;
     }
+    if (query.zoneId && mongoose.Types.ObjectId.isValid(String(query.zoneId))) {
+        filter.zoneId = new mongoose.Types.ObjectId(String(query.zoneId));
+    }
+    if (query.serviceAreaId && mongoose.Types.ObjectId.isValid(String(query.serviceAreaId))) {
+        filter.serviceAreaId = new mongoose.Types.ObjectId(String(query.serviceAreaId));
+    }
     const [restaurants, total] = await Promise.all([
         FoodRestaurant.find(filter)
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
-            .select('restaurantId restaurantName location area city profileImage coverImages menuImages status ownerName ownerPhone zoneId commissionPercentage isListed productCount pureVegRestaurant createdAt updatedAt showWithoutMenu')
+            .select('restaurantId restaurantName location area city profileImage coverImages menuImages status ownerName ownerPhone zoneId serviceAreaId commissionPercentage isListed productCount pureVegRestaurant createdAt updatedAt showWithoutMenu')
             .populate('zoneId', 'name zoneName')
+            .populate('serviceAreaId', 'name')
             .lean(),
         FoodRestaurant.countDocuments(filter)
     ]);
@@ -4313,19 +4321,56 @@ export async function updateRestaurantLocation(id, body = {}) {
     doc.pincode = pincode;
     doc.landmark = landmark;
 
+    let targetZoneId = doc.zoneId;
     if (body.zoneId !== undefined) {
         const zoneId = String(body.zoneId || '').trim();
         if (!zoneId) {
             doc.zoneId = undefined;
+            targetZoneId = undefined;
         } else if (!mongoose.Types.ObjectId.isValid(zoneId)) {
             throw new ValidationError('Invalid zoneId');
         } else {
             doc.zoneId = new mongoose.Types.ObjectId(zoneId);
+            targetZoneId = doc.zoneId;
+        }
+    }
+
+    if (targetZoneId && latitude !== null && longitude !== null) {
+        const zone = await FoodZone.findById(targetZoneId).select('coordinates').lean();
+        if (!zone || !Array.isArray(zone.coordinates) || zone.coordinates.length < 3) {
+            throw new ValidationError('Invalid zone configuration');
+        }
+        if (!isPointInPolygon(latitude, longitude, zone.coordinates)) {
+            throw new ValidationError('Selected address is outside the selected zone');
+        }
+    }
+
+    let targetServiceAreaId = doc.serviceAreaId;
+    if (body.serviceAreaId !== undefined) {
+        const serviceAreaId = String(body.serviceAreaId || '').trim();
+        if (!serviceAreaId) {
+            doc.serviceAreaId = undefined;
+            targetServiceAreaId = undefined;
+        } else if (!mongoose.Types.ObjectId.isValid(serviceAreaId)) {
+            throw new ValidationError('Invalid serviceAreaId');
+        } else {
+            doc.serviceAreaId = new mongoose.Types.ObjectId(serviceAreaId);
+            targetServiceAreaId = doc.serviceAreaId;
+        }
+    }
+
+    if (targetServiceAreaId && latitude !== null && longitude !== null) {
+        const serviceArea = await FoodServiceArea.findOne({ _id: targetServiceAreaId, zoneId: targetZoneId }).select('coordinates').lean();
+        if (!serviceArea) {
+            throw new ValidationError('Selected service area does not belong to the selected zone');
+        }
+        if (!isPointInPolygon(latitude, longitude, serviceArea.coordinates)) {
+            throw new ValidationError('Selected address is outside the selected service area');
         }
     }
 
     await doc.save();
-    return FoodRestaurant.findById(id).select('-__v').populate('zoneId', 'name zoneName serviceLocation isActive').lean();
+    return FoodRestaurant.findById(id).select('-__v').populate('zoneId', 'name zoneName serviceLocation isActive').populate('serviceAreaId', 'name').lean();
 }
 
 // ----- Categories -----
@@ -5606,16 +5651,40 @@ export async function createRestaurantByAdmin(body, performer = null) {
         approvedBy: performer || undefined
     };
 
-    if (body.zoneId !== undefined) {
-        const zoneId = String(body.zoneId || '').trim();
-        if (!zoneId) {
-            doc.zoneId = undefined;
-        } else if (!mongoose.Types.ObjectId.isValid(zoneId)) {
-            throw new ValidationError('Invalid zoneId');
-        } else {
-            doc.zoneId = new mongoose.Types.ObjectId(zoneId);
-        }
+    const zoneIdRaw = String(body.zoneId || '').trim();
+    if (!zoneIdRaw) {
+        throw new ValidationError('Zone is required');
     }
+    if (!mongoose.Types.ObjectId.isValid(zoneIdRaw)) {
+        throw new ValidationError('Invalid zoneId');
+    }
+    const zone = await FoodZone.findById(zoneIdRaw).select('coordinates').lean();
+    if (!zone || !Array.isArray(zone.coordinates) || zone.coordinates.length < 3) {
+        throw new ValidationError('Invalid zone configuration');
+    }
+    if (latitude === null || longitude === null) {
+        throw new ValidationError('Invalid address coordinates');
+    }
+    if (!isPointInPolygon(latitude, longitude, zone.coordinates)) {
+        throw new ValidationError('Selected address is outside the selected zone');
+    }
+    doc.zoneId = new mongoose.Types.ObjectId(zoneIdRaw);
+
+    const serviceAreaIdRaw = String(body.serviceAreaId || '').trim();
+    if (!serviceAreaIdRaw) {
+        throw new ValidationError('Service area is required');
+    }
+    if (!mongoose.Types.ObjectId.isValid(serviceAreaIdRaw)) {
+        throw new ValidationError('Invalid serviceAreaId');
+    }
+    const serviceArea = await FoodServiceArea.findOne({ _id: serviceAreaIdRaw, zoneId: zoneIdRaw }).select('coordinates').lean();
+    if (!serviceArea) {
+        throw new ValidationError('Selected service area does not belong to the selected zone');
+    }
+    if (!isPointInPolygon(latitude, longitude, serviceArea.coordinates)) {
+        throw new ValidationError('Selected address is outside the selected service area');
+    }
+    doc.serviceAreaId = new mongoose.Types.ObjectId(serviceAreaIdRaw);
 
     if (latitude !== null && longitude !== null) {
         doc.location = {
@@ -6701,6 +6770,12 @@ export async function getDeliveryPartners(query) {
             { state: { $regex: term, $options: 'i' } }
         ];
     }
+    if (query.zoneId && mongoose.Types.ObjectId.isValid(String(query.zoneId))) {
+        filter.zoneId = new mongoose.Types.ObjectId(String(query.zoneId));
+    }
+    if (query.serviceAreaId && mongoose.Types.ObjectId.isValid(String(query.serviceAreaId))) {
+        filter.serviceAreaId = new mongoose.Types.ObjectId(String(query.serviceAreaId));
+    }
 
     const limitNum = Math.max(1, Math.min(1000, Number(limit) || 30));
     const pageNum = Math.max(1, Number(page) || 1);
@@ -6711,6 +6786,8 @@ export async function getDeliveryPartners(query) {
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limitNum)
+            .populate('zoneId', 'name zoneName')
+            .populate('serviceAreaId', 'name')
             .lean(),
         FoodDeliveryPartner.countDocuments(filter)
     ]);
@@ -6734,6 +6811,7 @@ export async function getDeliveryPartners(query) {
 
     const deliveryPartners = list.map((doc, index) => {
         const detectedZone = detectZoneFromPartner(doc, zones);
+        const storedZoneName = doc.zoneId?.name || doc.zoneId?.zoneName || '';
         return {
             _id: doc._id,
             sl: skip + index + 1,
@@ -6742,7 +6820,10 @@ export async function getDeliveryPartners(query) {
             phone: doc.phone || '',
             city: doc.city || '',
             deliveryId: doc._id ? `DP-${doc._id.toString().slice(-8).toUpperCase()}` : null,
-            zone: detectedZone || doc.city || doc.state || doc.address || 'N/A',
+            zone: storedZoneName || detectedZone || doc.city || doc.state || doc.address || 'N/A',
+            zoneId: doc.zoneId?._id || doc.zoneId || null,
+            serviceAreaId: doc.serviceAreaId?._id || doc.serviceAreaId || null,
+            serviceAreaName: doc.serviceAreaId?.name || '',
             vehicleType: doc.vehicleType || '',
             status: doc.status,
             isActive: doc.isActive !== false,
@@ -7754,15 +7835,23 @@ export async function checkEarningAddonCompletions(deliveryPartnerId, _force = f
 }
 
 export async function getDeliveryPartnerById(id) {
-    const partner = await FoodDeliveryPartner.findById(id).lean();
+    const partner = await FoodDeliveryPartner.findById(id)
+        .populate('zoneId', 'name zoneName')
+        .populate('serviceAreaId', 'name')
+        .lean();
     if (!partner) return null;
 
     const zones = await FoodZone.find({ isActive: true }).lean();
     const detectedZone = detectZoneFromPartner(partner, zones);
+    const storedZoneName = partner.zoneId?.name || partner.zoneId?.zoneName || '';
 
     const deliveryId = partner._id ? `DP-${partner._id.toString().slice(-8).toUpperCase()}` : null;
     return {
         ...partner,
+        zoneId: partner.zoneId?._id || partner.zoneId || null,
+        serviceAreaId: partner.serviceAreaId?._id || partner.serviceAreaId || null,
+        zone: storedZoneName || detectedZone || partner.city || partner.state || 'N/A',
+        serviceAreaName: partner.serviceAreaId?.name || '',
         email: partner.email || null,
         deliveryId,
         detectedZone: detectedZone || partner.city || partner.state || 'N/A',
@@ -8355,6 +8444,109 @@ export async function updateZone(id, body) {
 export async function deleteZone(id) {
     const zone = await FoodZone.findByIdAndDelete(id);
     return zone ? { id } : null;
+}
+
+// ----- Service Areas (sub-polygons inside a Zone, data-filtering only) -----
+export async function getServiceAreas(query = {}) {
+    const limit = Math.min(Math.max(parseInt(query.limit, 10) || 100, 1), 1000);
+    const page = Math.max(parseInt(query.page, 10) || 1, 1);
+    const skip = (page - 1) * limit;
+
+    const filter = {};
+    if (query.zoneId && mongoose.Types.ObjectId.isValid(String(query.zoneId))) {
+        filter.zoneId = new mongoose.Types.ObjectId(String(query.zoneId));
+    }
+    if (query.isActive !== undefined && query.isActive !== '') {
+        filter.isActive = query.isActive === 'true' || query.isActive === '1';
+    }
+    if (typeof query.search === 'string' && query.search.trim()) {
+        filter.name = { $regex: query.search.trim(), $options: 'i' };
+    }
+
+    const [serviceAreas, total] = await Promise.all([
+        FoodServiceArea.find(filter)
+            .select('-geometry')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .lean(),
+        FoodServiceArea.countDocuments(filter),
+    ]);
+    return { serviceAreas, total, page, limit };
+}
+
+export async function getServiceAreaById(id) {
+    return FoodServiceArea.findById(id).select('-geometry').lean();
+}
+
+export async function createServiceArea(body) {
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (!name) return { error: 'Service area name is required' };
+    if (!body.zoneId || !mongoose.Types.ObjectId.isValid(String(body.zoneId))) {
+        return { error: 'A valid zoneId is required' };
+    }
+    const zone = await FoodZone.findById(body.zoneId).select('_id').lean();
+    if (!zone) return { error: 'Zone not found' };
+
+    const coordinates = Array.isArray(body.coordinates) ? body.coordinates : [];
+    if (coordinates.length < 3) return { error: 'At least 3 coordinates (polygon points) are required' };
+
+    const normalized = [];
+    for (const c of coordinates) {
+        const latitude = Number(c?.latitude);
+        const longitude = Number(c?.longitude);
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            return { error: 'Each coordinate must have valid finite latitude and longitude values' };
+        }
+        normalized.push({ latitude, longitude });
+    }
+
+    try {
+        const serviceArea = new FoodServiceArea({
+            zoneId: body.zoneId,
+            name,
+            coordinates: normalized,
+            isActive: body.isActive !== false,
+        });
+        await serviceArea.save();
+        return { serviceArea: serviceArea.toObject() };
+    } catch (err) {
+        if (err instanceof ValidationError) return { error: err.message };
+        throw err;
+    }
+}
+
+export async function updateServiceArea(id, body) {
+    const serviceArea = await FoodServiceArea.findById(id);
+    if (!serviceArea) return null;
+
+    if (body.name !== undefined) serviceArea.name = String(body.name).trim();
+    if (body.isActive !== undefined) serviceArea.isActive = body.isActive !== false;
+    if (Array.isArray(body.coordinates) && body.coordinates.length >= 3) {
+        const normalizedCoords = [];
+        for (const c of body.coordinates) {
+            const latitude = Number(c?.latitude);
+            const longitude = Number(c?.longitude);
+            if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+                return { error: 'Each coordinate must have valid finite latitude and longitude values' };
+            }
+            normalizedCoords.push({ latitude, longitude });
+        }
+        serviceArea.coordinates = normalizedCoords;
+    }
+
+    try {
+        await serviceArea.save();
+        return { serviceArea: serviceArea.toObject() };
+    } catch (err) {
+        if (err instanceof ValidationError) return { error: err.message };
+        throw err;
+    }
+}
+
+export async function deleteServiceArea(id) {
+    const serviceArea = await FoodServiceArea.findByIdAndDelete(id);
+    return serviceArea ? { id } : null;
 }
 
 // ----- Withdrawals (admin) -----

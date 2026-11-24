@@ -217,8 +217,11 @@ export default function RestaurantsList() {
   const [locationEditError, setLocationEditError] = useState("")
   const [zones, setZones] = useState([])
   const [zonesLoading, setZonesLoading] = useState(false)
+  const [serviceAreas, setServiceAreas] = useState([])
+  const [serviceAreasLoading, setServiceAreasLoading] = useState(false)
   const [locationForm, setLocationForm] = useState({
     zoneId: "",
+    serviceAreaId: "",
     latitude: "",
     longitude: "",
     formattedAddress: "",
@@ -535,9 +538,15 @@ export default function RestaurantsList() {
       typeof resolvedZoneId === "object"
         ? (resolvedZoneId?._id || resolvedZoneId?.id || "")
         : resolvedZoneId
+    const resolvedServiceAreaId = restaurant?.serviceAreaId || ""
+    const serviceAreaId =
+      typeof resolvedServiceAreaId === "object"
+        ? (resolvedServiceAreaId?._id || resolvedServiceAreaId?.id || "")
+        : resolvedServiceAreaId
 
     return {
       zoneId: zoneId || "",
+      serviceAreaId: serviceAreaId || "",
       latitude: latitude || "",
       longitude: longitude || "",
       formattedAddress: loc.formattedAddress || loc.address || "",
@@ -973,6 +982,7 @@ export default function RestaurantsList() {
       setSavingLocation(true)
       const locationPayload = {
         zoneId: locationForm.zoneId,
+        serviceAreaId: locationForm.serviceAreaId || "",
         latitude,
         longitude,
         coordinates: [longitude, latitude],
@@ -1067,6 +1077,36 @@ export default function RestaurantsList() {
     if (!targetZoneId) return null
     return zones.find((zone) => String(zone?._id || zone?.id || "") === targetZoneId) || null
   }, [zones, locationForm.zoneId])
+
+  // Service areas belong to one zone — refetch whenever the location form's zone changes.
+  useEffect(() => {
+    if (!isEditingLocation || !locationForm.zoneId) {
+      setServiceAreas([])
+      return
+    }
+    let cancelled = false
+    setServiceAreasLoading(true)
+    adminAPI.getServiceAreas({ zoneId: locationForm.zoneId, limit: 1000 })
+      .then((res) => {
+        const list = res?.data?.data?.serviceAreas || []
+        if (!cancelled) setServiceAreas(Array.isArray(list) ? list : [])
+      })
+      .catch(() => {
+        if (!cancelled) setServiceAreas([])
+      })
+      .finally(() => {
+        if (!cancelled) setServiceAreasLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isEditingLocation, locationForm.zoneId])
+
+  const selectedServiceArea = useMemo(() => {
+    const targetServiceAreaId = String(locationForm.serviceAreaId || "")
+    if (!targetServiceAreaId) return null
+    return serviceAreas.find((s) => String(s?._id || s?.id || "") === targetServiceAreaId) || null
+  }, [serviceAreas, locationForm.serviceAreaId])
 
   useEffect(() => {
     if (!isEditingLocation) return
@@ -2811,7 +2851,7 @@ export default function RestaurantsList() {
                             <label className="block text-xs text-slate-600 mb-1 font-semibold">Service Zone*</label>
                             <select
                               value={locationForm.zoneId || ""}
-                              onChange={(e) => setLocationForm((prev) => ({ ...prev, zoneId: e.target.value }))}
+                              onChange={(e) => setLocationForm((prev) => ({ ...prev, zoneId: e.target.value, serviceAreaId: "" }))}
                               className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm"
                             >
                               <option value="">{zonesLoading ? "Loading zones..." : "Select a zone"}</option>
@@ -2821,6 +2861,31 @@ export default function RestaurantsList() {
                                 </option>
                               ))}
                             </select>
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-xs text-slate-600 mb-1 font-semibold">Service Area (optional)</label>
+                            <select
+                              value={locationForm.serviceAreaId || ""}
+                              onChange={(e) => setLocationForm((prev) => ({ ...prev, serviceAreaId: e.target.value }))}
+                              className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm"
+                              disabled={!locationForm.zoneId}
+                            >
+                              <option value="">
+                                {!locationForm.zoneId
+                                  ? "Select a zone first"
+                                  : serviceAreasLoading
+                                    ? "Loading service areas..."
+                                    : "None / All service areas"}
+                              </option>
+                              {serviceAreas.map((s) => (
+                                <option key={s._id || s.id} value={s._id || s.id}>
+                                  {s.name}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="text-[11px] text-slate-500 mt-1">
+                              Data-filtering tag only — used to report/filter which sub-area of the zone this restaurant is in.
+                            </p>
                           </div>
 
                           <div className="md:col-span-2">

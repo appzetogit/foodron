@@ -50,6 +50,8 @@ export default function OutletInfo() {
   const [isPureVeg, setIsPureVeg] = useState(false)
   const [cuisineTags, setCuisineTags] = useState("")
   const [address, setAddress] = useState("")
+  const [zoneName, setZoneName] = useState("")
+  const [serviceAreaName, setServiceAreaName] = useState("")
   const [primaryPhone, setPrimaryPhone] = useState("")
   const [ownerInfo, setOwnerInfo] = useState({ name: "", phone: "", email: "" })
   const [legalInfo, setLegalInfo] = useState({ fssai: "", gst: "", pan: "" })
@@ -139,6 +141,8 @@ export default function OutletInfo() {
           const locToUse = pending.location || data.location || data
           const formattedAddress = formatAddress(locToUse)
           setAddress(formattedAddress)
+          setZoneName(data.zoneName || "")
+          setServiceAreaName(data.serviceAreaName || "")
           setPrimaryPhone((pending.primaryContactNumber ?? data.primaryContactNumber ?? pending.ownerPhone ?? data.ownerPhone) || "")
           
           // Set Owner Info
@@ -611,6 +615,13 @@ export default function OutletInfo() {
                     <p className="text-xs text-gray-400 font-medium">Outlet Address</p>
                   </div>
                   <p className="text-sm font-semibold text-gray-800 leading-relaxed">{address || "Address not set"}</p>
+                  {(zoneName || serviceAreaName) && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {zoneName && <>Zone: <span className="font-medium text-gray-700">{zoneName}</span></>}
+                      {zoneName && serviceAreaName && " · "}
+                      {serviceAreaName && <>Service Area: <span className="font-medium text-gray-700">{serviceAreaName}</span></>}
+                    </p>
+                  )}
                 </div>
                 <button onClick={() => navigate("/food/restaurant/edit-address")} className="p-2 hover:bg-gray-50 rounded-full transition-colors">
                   <Pencil className="w-4 h-4 text-[#FF0000]" />

@@ -1,4 +1,5 @@
 import { FoodZone } from '../../admin/models/zone.model.js';
+import { FoodServiceArea } from '../../admin/models/serviceArea.model.js';
 import { detectFoodZoneForPoint } from '../services/food-zone-lookup.service.js';
 
 const toFinite = (v) => {
@@ -39,6 +40,25 @@ export const listZonesPublicController = async (_req, res, next) => {
             success: true,
             message: 'Zones fetched successfully',
             data: { zones }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/** GET /zones/:zoneId/service-areas/public - list active service areas inside a zone, for onboarding selects */
+export const listServiceAreasPublicController = async (req, res, next) => {
+    try {
+        const { zoneId } = req.params;
+        const serviceAreas = await FoodServiceArea.find({ zoneId, isActive: true })
+            .select('name zoneId coordinates')
+            .sort({ createdAt: 1 })
+            .lean();
+
+        return res.status(200).json({
+            success: true,
+            message: 'Service areas fetched successfully',
+            data: { serviceAreas }
         });
     } catch (error) {
         next(error);

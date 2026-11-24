@@ -166,6 +166,7 @@ const buildOnboardingStepFormData = (stepNum, { step1, step2, step3 }) => {
     formData.append("ownerEmail", (step1.ownerEmail || "").trim())
     formData.append("primaryContactNumber", normalizePhoneDigits(step1.primaryContactNumber))
     formData.append("zoneId", step1.zoneId || "")
+    formData.append("serviceAreaId", step1.serviceAreaId || "")
     formData.append("addressLine1", step1.location?.addressLine1 || "")
     formData.append("addressLine2", step1.location?.addressLine2 || "")
     formData.append("area", step1.location?.area || "")
@@ -579,6 +580,8 @@ export default function RestaurantOnboarding() {
       primaryContactNumber: verified,
       zoneId: "",
       zoneName: "",
+      serviceAreaId: "",
+      serviceAreaName: "",
       ref: "",
       location: {
         formattedAddress: "",
@@ -816,6 +819,8 @@ export default function RestaurantOnboarding() {
           primaryContactNumber: verifiedPhone,
           zoneId: "",
           zoneName: "",
+          serviceAreaId: "",
+          serviceAreaName: "",
           ref: "",
           location: {
             formattedAddress: "",
@@ -890,6 +895,11 @@ export default function RestaurantOnboarding() {
               getZoneDisplayName(
                 typeof serverData.zoneId === "object" ? serverData.zoneId : null,
               ) ||
+              "",
+            serviceAreaId: normalizeZoneIdValue(serverData.serviceAreaId) || "",
+            serviceAreaName:
+              serverData.serviceAreaName ||
+              (typeof serverData.serviceAreaId === "object" ? serverData.serviceAreaId?.name : "") ||
               "",
             primaryContactNumber: serverData.primaryContactNumber || verifiedPhone,
             ref: "",
@@ -1290,6 +1300,7 @@ export default function RestaurantOnboarding() {
         formData.append("ownerPhone", normalizePhoneDigits(mergedStep1.ownerPhone))
         formData.append("primaryContactNumber", normalizePhoneDigits(mergedStep1.primaryContactNumber))
         formData.append("zoneId", mergedStep1.zoneId || "")
+        formData.append("serviceAreaId", mergedStep1.serviceAreaId || "")
         formData.append("addressLine1", mergedStep1.location?.addressLine1 || "")
         formData.append("addressLine2", mergedStep1.location?.addressLine2 || "")
         formData.append("area", mergedStep1.location?.area || "")
@@ -1516,6 +1527,29 @@ export default function RestaurantOnboarding() {
       ...prev,
       zoneId: newZoneId,
       zoneName: getZoneDisplayName(selectedZone),
+      serviceAreaId: "",
+      serviceAreaName: "",
+      location: {
+        formattedAddress: "",
+        addressLine1: "",
+        addressLine2: "",
+        area: "",
+        city: "",
+        state: "",
+        pincode: "",
+        landmark: "",
+        latitude: "",
+        longitude: "",
+      },
+    }))
+  }
+
+  const handleServiceAreaChange = (newServiceAreaId, serviceAreaLabel) => {
+    clearFieldError("locationPin")
+    setStep1((prev) => ({
+      ...prev,
+      serviceAreaId: newServiceAreaId,
+      serviceAreaName: serviceAreaLabel || "",
       location: {
         formattedAddress: "",
         addressLine1: "",
@@ -1753,9 +1787,11 @@ export default function RestaurantOnboarding() {
             zoneId={step1.zoneId}
             zones={zones}
             zonesLoading={zonesLoading}
+            serviceAreaId={step1.serviceAreaId}
             isEditing={isEditing}
             location={step1.location}
             onZoneChange={handleZoneChange}
+            onServiceAreaChange={handleServiceAreaChange}
             onLocationChange={handleLocationChange}
             zoneError={fieldErrors.zoneId}
             locationError={fieldErrors.locationPin}

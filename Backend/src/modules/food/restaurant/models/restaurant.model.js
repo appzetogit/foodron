@@ -252,6 +252,12 @@ const restaurantSchema = new mongoose.Schema(
       ref: "FoodZone",
       index: true,
     },
+    /** Data-filtering tag only — sub-area of zoneId. Never changes the zone-based operational flow. */
+    serviceAreaId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "FoodServiceArea",
+      index: true,
+    },
 
     businessModel: {
       type: String,

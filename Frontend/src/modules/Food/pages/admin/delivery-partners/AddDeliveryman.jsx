@@ -53,6 +53,8 @@ const emptyDetails = () => ({
   address: "",
   city: "",
   state: "",
+  zoneId: "",
+  serviceAreaId: "",
   vehicles: [],
   drivingLicenseNumber: "",
   panNumber: "",
@@ -300,6 +302,10 @@ export default function AddDeliveryman() {
   const [docErrors, setDocErrors] = useState({})
   const [catalog, setCatalog] = useState([])
   const [catalogLoading, setCatalogLoading] = useState(true)
+  const [zones, setZones] = useState([])
+  const [zonesLoading, setZonesLoading] = useState(false)
+  const [serviceAreas, setServiceAreas] = useState([])
+  const [serviceAreasLoading, setServiceAreasLoading] = useState(false)
   const [showAddVehicle, setShowAddVehicle] = useState(false)
   const [newVehicle, setNewVehicle] = useState({
     vehicleId: "",
@@ -395,6 +401,51 @@ export default function AddDeliveryman() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setZonesLoading(true)
+    adminAPI
+      .getZones({ limit: 1000 })
+      .then((res) => {
+        const list = res?.data?.data?.zones || res?.data?.zones || []
+        if (!cancelled) setZones(Array.isArray(list) ? list : [])
+      })
+      .catch(() => {
+        if (!cancelled) setZones([])
+      })
+      .finally(() => {
+        if (!cancelled) setZonesLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Service areas belong to one zone — refetch whenever the selected zone changes.
+  useEffect(() => {
+    if (!details.zoneId) {
+      setServiceAreas([])
+      return
+    }
+    let cancelled = false
+    setServiceAreasLoading(true)
+    adminAPI
+      .getServiceAreas({ zoneId: details.zoneId, limit: 1000 })
+      .then((res) => {
+        const list = res?.data?.data?.serviceAreas || []
+        if (!cancelled) setServiceAreas(Array.isArray(list) ? list : [])
+      })
+      .catch(() => {
+        if (!cancelled) setServiceAreas([])
+      })
+      .finally(() => {
+        if (!cancelled) setServiceAreasLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [details.zoneId])
 
   const requiresDl = details.vehicles.some((v) => {
     const master = catalog.find((p) => String(p.id) === String(v.vehicleId))
@@ -507,6 +558,9 @@ export default function AddDeliveryman() {
     else if (!isValidLocationValue(details.city)) next.city = "City can contain letters only"
     if (!details.state.trim()) next.state = "State is required"
     else if (!isValidLocationValue(details.state)) next.state = "State can contain letters only"
+
+    if (!details.zoneId) next.zoneId = "Zone is required"
+    if (!details.serviceAreaId) next.serviceAreaId = "Service area is required"
 
     if (details.vehicles.length === 0) next.vehicles = "Please add at least one vehicle"
 
@@ -641,6 +695,8 @@ export default function AddDeliveryman() {
       formData.append("address", details.address.trim())
       formData.append("city", details.city.trim())
       formData.append("state", details.state.trim())
+      formData.append("zoneId", details.zoneId || "")
+      formData.append("serviceAreaId", details.serviceAreaId || "")
       formData.append("vehicles", JSON.stringify(details.vehicles))
       formData.append("submissionType", "initial")
       if (details.drivingLicenseNumber) {
@@ -873,6 +929,70 @@ export default function AddDeliveryman() {
                       }`}
                     />
                     {errors.state ? <p className="text-xs text-red-500 mt-1">{errors.state}</p> : null}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Zone <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={details.zoneId || ""}
+                      onChange={(e) => {
+                        updateDetail("zoneId", e.target.value)
+                        updateDetail("serviceAreaId", "")
+                      }}
+                      className={`w-full px-4 py-2.5 border rounded-lg text-sm bg-white ${
+                        errors.zoneId ? "border-red-500" : "border-slate-300"
+                      }`}
+                      disabled={zonesLoading}
+                    >
+                      <option value="">{zonesLoading ? "Loading zones..." : "Select a zone"}</option>
+                      {zones.map((z) => {
+                        const id = String(z?._id || z?.id || "")
+                        const label = z?.name || z?.zoneName || z?.serviceLocation || id
+                        return (
+                          <option key={id} value={id}>
+                            {label}
+                          </option>
+                        )
+                      })}
+                    </select>
+                    {errors.zoneId ? <p className="text-xs text-red-500 mt-1">{errors.zoneId}</p> : null}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Service area <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={details.serviceAreaId || ""}
+                      onChange={(e) => updateDetail("serviceAreaId", e.target.value)}
+                      className={`w-full px-4 py-2.5 border rounded-lg text-sm bg-white ${
+                        errors.serviceAreaId ? "border-red-500" : "border-slate-300"
+                      }`}
+                      disabled={serviceAreasLoading || !details.zoneId}
+                    >
+                      <option value="">
+                        {!details.zoneId
+                          ? "Select a zone first"
+                          : serviceAreasLoading
+                            ? "Loading service areas..."
+                            : "Select a service area"}
+                      </option>
+                      {serviceAreas.map((s) => {
+                        const id = String(s?._id || s?.id || "")
+                        return (
+                          <option key={id} value={id}>
+                            {s?.name || id}
+                          </option>
+                        )
+                      })}
+                    </select>
+                    {errors.serviceAreaId ? (
+                      <p className="text-xs text-red-500 mt-1">{errors.serviceAreaId}</p>
+                    ) : (
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Data-filtering tag only — never changes how orders are dispatched to this driver.
+                      </p>
+                    )}
                   </div>
                 </div>
               </section>

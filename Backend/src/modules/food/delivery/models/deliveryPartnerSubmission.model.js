@@ -10,6 +10,8 @@ const submissionSnapshotSchema = new mongoose.Schema(
         address: { type: String, default: '' },
         city: { type: String, default: '' },
         state: { type: String, default: '' },
+        zoneId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodZone', default: null },
+        serviceAreaId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodServiceArea', default: null },
         vehicleType: { type: String, default: '' },
         vehicleName: { type: String, default: '' },
         vehicleNumber: { type: String, default: '' },

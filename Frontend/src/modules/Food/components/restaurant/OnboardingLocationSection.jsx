@@ -13,6 +13,7 @@ import {
 import { getGoogleMapsApiKey } from "@food/utils/googleMapsApiKey"
 import { loadGoogleMaps } from "@core/services/googleMapsLoader"
 import { toast } from "sonner"
+import { zoneAPI } from "@food/api"
 import {
   ONBOARDING_HINT,
   ONBOARDING_INPUT,
@@ -58,6 +59,10 @@ const isLatLngInsideZone = (lat, lng, zone, google) => {
     polygon,
   )
 }
+
+// Same containment check, reused for a service area (a sub-polygon of the zone).
+const isLatLngInsideServiceArea = (lat, lng, serviceArea, google) =>
+  isLatLngInsideZone(lat, lng, serviceArea, google)
 
 const parsePlaceDetails = (place) => {
   const formattedAddress = place?.formatted_address || ""
@@ -120,9 +125,11 @@ export default function OnboardingLocationSection({
   zoneId,
   zones,
   zonesLoading,
+  serviceAreaId,
   isEditing,
   location,
   onZoneChange,
+  onServiceAreaChange,
   onLocationChange,
   zoneError = "",
   locationError = "",
@@ -131,6 +138,7 @@ export default function OnboardingLocationSection({
   const mapInstanceRef = useRef(null)
   const markerRef = useRef(null)
   const zonePolygonRef = useRef(null)
+  const serviceAreaPolygonRef = useRef(null)
   const autocompleteServiceRef = useRef(null)
   const placesServiceRef = useRef(null)
   const geocoderRef = useRef(null)
@@ -155,6 +163,32 @@ export default function OnboardingLocationSection({
   const selectedZone = zones.find((z) => String(z._id || z.id) === String(zoneId))
   const zoneSelected = Boolean(zoneId)
   const locationFieldsDisabled = !zoneSelected || !isEditing
+
+  const [serviceAreas, setServiceAreas] = useState([])
+  const [serviceAreasLoading, setServiceAreasLoading] = useState(false)
+  const selectedServiceArea = serviceAreas.find((s) => String(s._id || s.id) === String(serviceAreaId))
+
+  // Service areas belong to one zone — refetch whenever the zone changes.
+  useEffect(() => {
+    if (!zoneId) {
+      setServiceAreas([])
+      return
+    }
+    let cancelled = false
+    setServiceAreasLoading(true)
+    zoneAPI.getPublicServiceAreas(zoneId)
+      .then((res) => {
+        const list = res?.data?.data?.serviceAreas || []
+        if (!cancelled) setServiceAreas(Array.isArray(list) ? list : [])
+      })
+      .catch(() => {
+        if (!cancelled) setServiceAreas([])
+      })
+      .finally(() => {
+        if (!cancelled) setServiceAreasLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [zoneId])
 
   const applyLocation = useCallback(
     (parsed, { fromSuggestion = false, outsideZone = false } = {}) => {
@@ -193,15 +227,29 @@ export default function OnboardingLocationSection({
     mapInstanceRef.current.panTo(position)
   }, [])
 
+  // Checks the zone, then (if one is picked) the narrower service-area sub-polygon.
+  const isOutsideAllowedArea = useCallback(
+    (lat, lng, google) => {
+      if (!isLatLngInsideZone(lat, lng, selectedZone, google)) return true
+      if (selectedServiceArea && !isLatLngInsideServiceArea(lat, lng, selectedServiceArea, google)) return true
+      return false
+    },
+    [selectedZone, selectedServiceArea],
+  )
+
   const handleCoordsSelected = useCallback(
     async (lat, lng, { fromDrag = false } = {}) => {
       if (!selectedZone || !window.google) return
 
-      const outsideZone = !isLatLngInsideZone(lat, lng, selectedZone, window.google)
+      const outsideZone = isOutsideAllowedArea(lat, lng, window.google)
       if (outsideZone) {
         setLocationOutsideZone(true)
         setPickedFromSuggestion(false)
-        toast.error("Selected location is outside the selected service zone")
+        toast.error(
+          selectedServiceArea
+            ? "Selected location is outside the selected service area"
+            : "Selected location is outside the selected service zone",
+        )
         onLocationChange({ outsideZone: true, fromSuggestion: false })
         const prev = locationRef.current
         if (fromDrag && markerRef.current && prev?.latitude && prev?.longitude) {
@@ -241,7 +289,7 @@ export default function OnboardingLocationSection({
         updateMarker(lat, lng, window.google)
       })
     },
-    [selectedZone, applyLocation, onLocationChange, updateMarker],
+    [selectedZone, selectedServiceArea, isOutsideAllowedArea, applyLocation, onLocationChange, updateMarker],
   )
 
   handleCoordsSelectedRef.current = handleCoordsSelected
@@ -251,6 +299,10 @@ export default function OnboardingLocationSection({
       if (zonePolygonRef.current) {
         zonePolygonRef.current.setMap(null)
         zonePolygonRef.current = null
+      }
+      if (serviceAreaPolygonRef.current) {
+        serviceAreaPolygonRef.current.setMap(null)
+        serviceAreaPolygonRef.current = null
       }
       if (!selectedZone) return
 
@@ -269,11 +321,33 @@ export default function OnboardingLocationSection({
       })
       zonePolygonRef.current.setMap(map)
 
+      // A service area is a tighter sub-boundary inside the zone — draw it on top in a
+      // different color so it's clear the pin must land inside the smaller shape, not
+      // anywhere in the full (lighter) zone outline.
+      let boundsPath = path
+      if (selectedServiceArea) {
+        const serviceAreaPath = zonePolygonPath(selectedServiceArea, google)
+        if (serviceAreaPath.length >= 3) {
+          serviceAreaPolygonRef.current = new google.maps.Polygon({
+            paths: serviceAreaPath,
+            strokeColor: "#16a34a",
+            strokeOpacity: 0.9,
+            strokeWeight: 2,
+            fillColor: "#16a34a",
+            fillOpacity: 0.18,
+            clickable: false,
+            zIndex: 2,
+          })
+          serviceAreaPolygonRef.current.setMap(map)
+          boundsPath = serviceAreaPath
+        }
+      }
+
       const bounds = new google.maps.LatLngBounds()
-      path.forEach((p) => bounds.extend(p))
+      boundsPath.forEach((p) => bounds.extend(p))
       map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 })
     },
-    [selectedZone],
+    [selectedZone, selectedServiceArea],
   )
 
   const initMap = useCallback(async () => {
@@ -357,7 +431,7 @@ export default function OnboardingLocationSection({
     const lat = parseMapCoord(location?.latitude)
     const lng = parseMapCoord(location?.longitude)
     if (hasValidMapCoords(lat, lng) && selectedZone && window.google) {
-      const outside = !isLatLngInsideZone(lat, lng, selectedZone, window.google)
+      const outside = isOutsideAllowedArea(lat, lng, window.google)
       setLocationOutsideZone(outside)
       if (mapInstanceRef.current) {
         updateMarker(lat, lng, window.google)
@@ -368,7 +442,7 @@ export default function OnboardingLocationSection({
       setLocationOutsideZone(false)
       setPickedFromSuggestion(false)
     }
-  }, [location?.formattedAddress, location?.latitude, location?.longitude, selectedZone, updateMarker])
+  }, [location?.formattedAddress, location?.latitude, location?.longitude, selectedZone, isOutsideAllowedArea, updateMarker])
 
   useEffect(() => {
     if (markerRef.current) {
@@ -447,12 +521,7 @@ export default function OnboardingLocationSection({
           return
         }
 
-        const outsideZone = !isLatLngInsideZone(
-          parsed.latitude,
-          parsed.longitude,
-          selectedZone,
-          window.google,
-        )
+        const outsideZone = isOutsideAllowedArea(parsed.latitude, parsed.longitude, window.google)
 
         if (outsideZone) {
           setSearchQuery("")
@@ -460,7 +529,11 @@ export default function OnboardingLocationSection({
           setShowPredictions(false)
           setLocationOutsideZone(true)
           setPickedFromSuggestion(false)
-          toast.error("Selected address is outside the selected service zone")
+          toast.error(
+            selectedServiceArea
+              ? "Selected address is outside the selected service area"
+              : "Selected address is outside the selected service zone",
+          )
           onLocationChange({ outsideZone: true, fromSuggestion: false })
           return
         }
@@ -565,6 +638,40 @@ export default function OnboardingLocationSection({
         )}
       </div>
 
+      {zoneSelected && serviceAreas.length > 0 && (
+        <div>
+          <Label className={ONBOARDING_LABEL}>Service area (optional)</Label>
+          <Select
+            value={serviceAreaId || ""}
+            onValueChange={(value) => {
+              const label = serviceAreas.find((s) => String(s._id || s.id) === value)?.name || ""
+              onServiceAreaChange?.(value, label)
+            }}
+            disabled={serviceAreasLoading || !isEditing}
+          >
+            <SelectTrigger className={`${ONBOARDING_INPUT} h-11`}>
+              <SelectValue
+                placeholder={serviceAreasLoading ? "Loading service areas..." : "Select a service area (optional)"}
+              />
+            </SelectTrigger>
+            <SelectContent className="max-h-60">
+              {serviceAreas.map((s) => {
+                const id = String(s?._id || s?.id || "")
+                return (
+                  <SelectItem key={id} value={id} className="cursor-pointer">
+                    {s?.name || id}
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
+          <p className={`${ONBOARDING_HINT} mt-2`}>
+            Optional. Narrows your pin to a smaller area inside the zone, only used to help
+            {" "}{`${selectedZone?.name || selectedZone?.zoneName || "the zone"}`}'s admin filter/report data.
+          </p>
+        </div>
+      )}
+
       <div>
         <Label className={ONBOARDING_LABEL}>Search location</Label>
         {!zoneSelected && (
@@ -616,13 +723,16 @@ export default function OnboardingLocationSection({
         {locationOutsideZone && (
           <p className="mt-2 flex items-start gap-1.5 text-xs text-red-600">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>Selected location is outside the selected service zone. Pin a location inside the highlighted area.</span>
+            <span>
+              Selected location is outside the selected {selectedServiceArea ? "service area" : "service zone"}. Pin a
+              location inside the highlighted area.
+            </span>
           </p>
         )}
         {pickedFromSuggestion && !locationOutsideZone && (
           <p className="mt-2 flex items-start gap-1.5 text-xs text-emerald-700">
             <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>Location confirmed inside the service zone.</span>
+            <span>Location confirmed inside the {selectedServiceArea ? "service area" : "service zone"}.</span>
           </p>
         )}
         {zoneSelected && !locationOutsideZone && !pickedFromSuggestion && (
@@ -646,7 +756,9 @@ export default function OnboardingLocationSection({
                   ) : null}
                 </p>
                 <p className="text-[11px] text-slate-500">
-                  Red area shows the admin-defined service zone. Your pin must be inside it.
+                  {selectedServiceArea
+                    ? "Green area shows your selected service area inside the zone. Your pin must be inside it."
+                    : "Red area shows the admin-defined service zone. Your pin must be inside it."}
                 </p>
               </div>
               <Button

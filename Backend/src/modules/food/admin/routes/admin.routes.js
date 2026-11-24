@@ -293,6 +293,13 @@ router.patch('/zones/:id', checkPermission('food::restaurant_management::zone_se
 router.delete('/zones/:id', checkPermission('food::restaurant_management::zone_setup', 'delete'), adminController.deleteZone);
 router.get('/zones/:id/restaurants', checkPermission('food::restaurant_management::zone_setup', 'view'), adminController.getRestaurantsInZone);
 
+// ----- Service Areas (sub-polygons inside a Zone, data-filtering only) -----
+router.get('/service-areas', checkPermission('food::restaurant_management::zone_setup', 'view'), adminController.getServiceAreas);
+router.get('/service-areas/:id', checkPermission('food::restaurant_management::zone_setup', 'view'), adminController.getServiceAreaById);
+router.post('/service-areas', checkPermission('food::restaurant_management::zone_setup', 'create'), adminController.createServiceArea);
+router.patch('/service-areas/:id', checkPermission('food::restaurant_management::zone_setup', 'edit'), adminController.updateServiceArea);
+router.delete('/service-areas/:id', checkPermission('food::restaurant_management::zone_setup', 'delete'), adminController.deleteServiceArea);
+
 
 // ----- Orders -----
 router.get('/orders', checkPermission('food::order_management::orders', 'view'), orderController.listOrdersAdminController);
