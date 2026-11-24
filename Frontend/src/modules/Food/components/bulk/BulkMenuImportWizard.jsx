@@ -38,6 +38,25 @@ const PREVIEW_LIMIT = 200
 const errorMessageOf = (error, fallback) =>
   error?.response?.data?.message || error?.message || fallback
 
+const ACTIVE_JOB_STORAGE_KEY = "fudron_bulk_menu_active_job"
+
+const readStoredJobId = () => {
+  try {
+    return window.localStorage.getItem(ACTIVE_JOB_STORAGE_KEY) || null
+  } catch {
+    return null
+  }
+}
+
+const writeStoredJobId = (jobId) => {
+  try {
+    if (jobId) window.localStorage.setItem(ACTIVE_JOB_STORAGE_KEY, jobId)
+    else window.localStorage.removeItem(ACTIVE_JOB_STORAGE_KEY)
+  } catch {
+    // Best-effort only; losing this just means a refresh won't resume the job view.
+  }
+}
+
 const saveBlob = (blob, filename) => {
   const url = window.URL.createObjectURL(blob)
   const anchor = document.createElement("a")
@@ -121,12 +140,37 @@ export default function BulkMenuImportWizard({
     setFilter("all")
     setDuplicateMode("skip")
     if (fileInputRef.current) fileInputRef.current.value = ""
+    writeStoredJobId(null)
   }, [])
 
   // A different restaurant/context invalidates any validated package.
   useEffect(() => {
     reset()
   }, [resetKey, reset])
+
+  // Resume an in-progress/finished import after a page refresh (the job itself lives on the
+  // server; only the browser tab state was lost).
+  useEffect(() => {
+    const storedJobId = readStoredJobId()
+    if (!storedJobId) return
+    let cancelled = false
+    api
+      .status(storedJobId)
+      .then((res) => {
+        if (cancelled) return
+        const data = res?.data?.data
+        if (data && ["queued", "processing", "completed", "failed"].includes(data.status)) {
+          setJob(data)
+        } else {
+          writeStoredJobId(null)
+        }
+      })
+      .catch(() => writeStoredJobId(null))
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const importing = job && ["queued", "processing"].includes(job.status)
   const finished = job && ["completed", "failed"].includes(job.status)
@@ -195,8 +239,9 @@ export default function BulkMenuImportWizard({
     try {
       const res = await api.start(validation.jobId, { duplicateMode })
       const data = res?.data?.data
+      const jobId = data?.jobId || validation.jobId
       setJob({
-        jobId: data?.jobId || validation.jobId,
+        jobId,
         jobCode: data?.jobCode || validation.jobCode,
         entity: validation.entity,
         status: data?.status || "queued",
@@ -206,6 +251,7 @@ export default function BulkMenuImportWizard({
         },
         counters: { imported: 0, skipped: 0, failed: 0 },
       })
+      writeStoredJobId(jobId)
     } catch (error) {
       toast.error(errorMessageOf(error, "Could not start the import"))
     } finally {

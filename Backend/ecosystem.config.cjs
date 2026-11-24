@@ -60,6 +60,11 @@ module.exports = {
             max_memory_restart: '250M',
         }),
 
+        // Admin/restaurant bulk menu ZIP imports (processes staged ZIPs on this same machine).
+        worker('fudron-worker-bulk-menu-import', 'src/queues/workers/bulkMenuImport.worker.js', {
+            max_memory_restart: '300M',
+        }),
+
         // Not started: otp.worker.js and notification.worker.js. Their processors are
         // still placeholders that only log and return, so running them does nothing.
         // Add them here once the SMS/FCM logic actually lands in those processors.
