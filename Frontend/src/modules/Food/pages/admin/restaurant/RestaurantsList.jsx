@@ -287,6 +287,34 @@ export default function RestaurantsList() {
     return `#REST${lastDigits}`
   }
 
+  const [listZones, setListZones] = useState([])
+  const [listZoneId, setListZoneId] = useState("")
+  const [listServiceAreas, setListServiceAreas] = useState([])
+  const [listServiceAreaId, setListServiceAreaId] = useState("")
+
+  useEffect(() => {
+    adminAPI.getZones({ limit: 1000, isActive: true, view: "summary" })
+      .then((res) => {
+        const list = res?.data?.data?.zones || []
+        setListZones(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setListZones([]))
+  }, [])
+
+  // Fetch service areas for the selected zone (optional narrower filter)
+  useEffect(() => {
+    if (!listZoneId) {
+      setListServiceAreas([])
+      return
+    }
+    adminAPI.getServiceAreas({ zoneId: listZoneId })
+      .then((res) => {
+        const list = res?.data?.data?.serviceAreas || []
+        setListServiceAreas(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setListServiceAreas([]))
+  }, [listZoneId])
+
   // Fetch restaurants from backend API
   useEffect(() => {
     let cancelled = false
@@ -400,33 +428,6 @@ export default function RestaurantsList() {
   const [filters, setFilters] = useState({
     all: "All",
   })
-  const [listZones, setListZones] = useState([])
-  const [listZoneId, setListZoneId] = useState("")
-  const [listServiceAreas, setListServiceAreas] = useState([])
-  const [listServiceAreaId, setListServiceAreaId] = useState("")
-
-  useEffect(() => {
-    adminAPI.getZones({ limit: 1000, isActive: true, view: "summary" })
-      .then((res) => {
-        const list = res?.data?.data?.zones || []
-        setListZones(Array.isArray(list) ? list : [])
-      })
-      .catch(() => setListZones([]))
-  }, [])
-
-  // Fetch service areas for the selected zone (optional narrower filter)
-  useEffect(() => {
-    if (!listZoneId) {
-      setListServiceAreas([])
-      return
-    }
-    adminAPI.getServiceAreas({ zoneId: listZoneId })
-      .then((res) => {
-        const list = res?.data?.data?.serviceAreas || []
-        setListServiceAreas(Array.isArray(list) ? list : [])
-      })
-      .catch(() => setListServiceAreas([]))
-  }, [listZoneId])
 
   const filteredRestaurants = useMemo(() => {
     let result = [...restaurants]
