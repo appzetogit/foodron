@@ -5693,12 +5693,8 @@ export async function createRestaurantByAdmin(body, performer = null) {
     }
     doc.zoneId = new mongoose.Types.ObjectId(zoneIdRaw);
 
+    // Service area is an optional data-filter tag — no requiredness or pin-containment enforced here.
     const serviceAreaIdRaw = String(body.serviceAreaId || '').trim();
-    // Service area is required whenever the zone has at least one defined.
-    const zoneHasServiceAreas = await FoodServiceArea.exists({ zoneId: zoneIdRaw });
-    if (zoneHasServiceAreas && !serviceAreaIdRaw) {
-        throw new ValidationError('Service area is required');
-    }
     if (serviceAreaIdRaw) {
         if (!mongoose.Types.ObjectId.isValid(serviceAreaIdRaw)) {
             throw new ValidationError('Invalid serviceAreaId');
@@ -5706,9 +5702,6 @@ export async function createRestaurantByAdmin(body, performer = null) {
         const serviceArea = await FoodServiceArea.findOne({ _id: serviceAreaIdRaw, zoneId: zoneIdRaw }).select('coordinates').lean();
         if (!serviceArea) {
             throw new ValidationError('Selected service area does not belong to the selected zone');
-        }
-        if (!isPointInPolygon(latitude, longitude, serviceArea.coordinates)) {
-            throw new ValidationError('Selected address is outside the selected service area');
         }
         doc.serviceAreaId = new mongoose.Types.ObjectId(serviceAreaIdRaw);
     }

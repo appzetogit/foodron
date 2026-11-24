@@ -1034,11 +1034,7 @@ export const saveOnboardingStep = async (stepNum, payload, files) => {
         if (!isPointInPolygon(latNum, lngNum, zone.coordinates)) {
             throw new ValidationError('Selected address is outside the selected zone');
         }
-        // Service area is required whenever the zone has at least one defined.
-        const zoneHasServiceAreas = await FoodServiceArea.exists({ zoneId: step1Data.zoneId });
-        if (zoneHasServiceAreas && !step1Data.serviceAreaId) {
-            throw new ValidationError('Service area is required');
-        }
+        // Service area is an optional data-filter tag — no requiredness or pin-containment enforced here.
         if (step1Data.serviceAreaId) {
             const serviceArea = await FoodServiceArea.findOne({
                 _id: step1Data.serviceAreaId,
@@ -1046,9 +1042,6 @@ export const saveOnboardingStep = async (stepNum, payload, files) => {
             }).lean();
             if (!serviceArea) {
                 throw new ValidationError('Selected service area does not belong to the selected zone');
-            }
-            if (!isPointInPolygon(latNum, lngNum, serviceArea.coordinates)) {
-                throw new ValidationError('Selected address is outside the selected service area');
             }
         }
 
@@ -1340,20 +1333,12 @@ export const registerRestaurant = async (payload, files, authUserId) => {
             throw new ValidationError('Selected address is outside the selected zone');
         }
 
-        // Service area is required whenever the zone has at least one defined.
-        const zoneHasServiceAreas = await FoodServiceArea.exists({ zoneId });
-        if (zoneHasServiceAreas && !serviceAreaId) {
-            throw new ValidationError('Service area is required');
-        }
-
+        // Service area is an optional data-filter tag — no requiredness or pin-containment enforced here.
         let resolvedServiceAreaId;
         if (serviceAreaId) {
             const serviceArea = await FoodServiceArea.findOne({ _id: serviceAreaId, zoneId }).lean();
             if (!serviceArea) {
                 throw new ValidationError('Selected service area does not belong to the selected zone');
-            }
-            if (!isPointInPolygon(latNum, lngNum, serviceArea.coordinates)) {
-                throw new ValidationError('Selected address is outside the selected service area');
             }
             resolvedServiceAreaId = serviceArea._id;
         }
@@ -2071,19 +2056,12 @@ export const updateRestaurantProfile = async (restaurantId, body = {}) => {
             throw new ValidationError('Selected address is outside the selected zone');
         }
 
+        // Service area is an optional data-filter tag — no requiredness or pin-containment enforced here.
         const targetServiceAreaId = update.serviceAreaId !== undefined ? update.serviceAreaId : currentRestaurant.serviceAreaId;
-        // Service area is required whenever the zone has at least one defined.
-        const zoneHasServiceAreas = await FoodServiceArea.exists({ zoneId: targetZoneId });
-        if (zoneHasServiceAreas && !targetServiceAreaId) {
-            throw new ValidationError('Service area is required');
-        }
         if (targetServiceAreaId) {
             const serviceArea = await FoodServiceArea.findOne({ _id: targetServiceAreaId, zoneId: targetZoneId }).lean();
             if (!serviceArea) {
                 throw new ValidationError('Selected service area does not belong to the selected zone');
-            }
-            if (!isPointInPolygon(lat, lng, serviceArea.coordinates)) {
-                throw new ValidationError('Selected address is outside the selected service area');
             }
         }
 

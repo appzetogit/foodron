@@ -132,7 +132,6 @@ export default function OnboardingLocationSection({
   onServiceAreaChange,
   onLocationChange,
   zoneError = "",
-  serviceAreaError = "",
   locationError = "",
 }) {
   const mapContainerRef = useRef(null)
@@ -228,14 +227,10 @@ export default function OnboardingLocationSection({
     mapInstanceRef.current.panTo(position)
   }, [])
 
-  // Checks the zone, then (if one is picked) the narrower service-area sub-polygon.
+  // Service area is a data-filter tag only — the pin only ever needs to be inside the zone.
   const isOutsideAllowedArea = useCallback(
-    (lat, lng, google) => {
-      if (!isLatLngInsideZone(lat, lng, selectedZone, google)) return true
-      if (selectedServiceArea && !isLatLngInsideServiceArea(lat, lng, selectedServiceArea, google)) return true
-      return false
-    },
-    [selectedZone, selectedServiceArea],
+    (lat, lng, google) => !isLatLngInsideZone(lat, lng, selectedZone, google),
+    [selectedZone],
   )
 
   const handleCoordsSelected = useCallback(
@@ -246,11 +241,7 @@ export default function OnboardingLocationSection({
       if (outsideZone) {
         setLocationOutsideZone(true)
         setPickedFromSuggestion(false)
-        toast.error(
-          selectedServiceArea
-            ? "Selected location is outside the selected service area"
-            : "Selected location is outside the selected service zone",
-        )
+        toast.error("Selected location is outside the selected service zone")
         onLocationChange({ outsideZone: true, fromSuggestion: false })
         const prev = locationRef.current
         if (fromDrag && markerRef.current && prev?.latitude && prev?.longitude) {
@@ -322,10 +313,8 @@ export default function OnboardingLocationSection({
       })
       zonePolygonRef.current.setMap(map)
 
-      // A service area is a tighter sub-boundary inside the zone — draw it on top in a
-      // different color so it's clear the pin must land inside the smaller shape, not
-      // anywhere in the full (lighter) zone outline.
-      let boundsPath = path
+      // A service area is just a data-filter tag, shown here for reference only —
+      // it never restricts where the pin can go, so the map stays fit to the full zone.
       if (selectedServiceArea) {
         const serviceAreaPath = zonePolygonPath(selectedServiceArea, google)
         if (serviceAreaPath.length >= 3) {
@@ -340,12 +329,11 @@ export default function OnboardingLocationSection({
             zIndex: 2,
           })
           serviceAreaPolygonRef.current.setMap(map)
-          boundsPath = serviceAreaPath
         }
       }
 
       const bounds = new google.maps.LatLngBounds()
-      boundsPath.forEach((p) => bounds.extend(p))
+      path.forEach((p) => bounds.extend(p))
       map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 })
     },
     [selectedZone, selectedServiceArea],
@@ -530,11 +518,7 @@ export default function OnboardingLocationSection({
           setShowPredictions(false)
           setLocationOutsideZone(true)
           setPickedFromSuggestion(false)
-          toast.error(
-            selectedServiceArea
-              ? "Selected address is outside the selected service area"
-              : "Selected address is outside the selected service zone",
-          )
+          toast.error("Selected address is outside the selected service zone")
           onLocationChange({ outsideZone: true, fromSuggestion: false })
           return
         }
@@ -641,7 +625,7 @@ export default function OnboardingLocationSection({
 
       {zoneSelected && serviceAreas.length > 0 && (
         <div>
-          <Label className={ONBOARDING_LABEL}>Service area*</Label>
+          <Label className={ONBOARDING_LABEL}>Service area (optional)</Label>
           <Select
             value={serviceAreaId || ""}
             onValueChange={(value) => {
@@ -650,9 +634,9 @@ export default function OnboardingLocationSection({
             }}
             disabled={serviceAreasLoading || !isEditing}
           >
-            <SelectTrigger className={serviceAreaError ? `${ONBOARDING_INPUT} h-11 border-red-400 ring-2 ring-red-200` : `${ONBOARDING_INPUT} h-11`}>
+            <SelectTrigger className={`${ONBOARDING_INPUT} h-11`}>
               <SelectValue
-                placeholder={serviceAreasLoading ? "Loading service areas..." : "Select a service area"}
+                placeholder={serviceAreasLoading ? "Loading service areas..." : "Select a service area (optional)"}
               />
             </SelectTrigger>
             <SelectContent className="max-h-60">
@@ -666,14 +650,10 @@ export default function OnboardingLocationSection({
               })}
             </SelectContent>
           </Select>
-          {serviceAreaError ? (
-            <p className="mt-1.5 text-xs font-medium text-red-600">{serviceAreaError}</p>
-          ) : (
-            <p className={`${ONBOARDING_HINT} mt-2`}>
-              Your pin must fall inside the selected service area within
-              {" "}{`${selectedZone?.name || selectedZone?.zoneName || "the zone"}`}.
-            </p>
-          )}
+          <p className={`${ONBOARDING_HINT} mt-2`}>
+            Optional. Narrows your pin to a smaller area inside the zone, only used to help
+            {" "}{`${selectedZone?.name || selectedZone?.zoneName || "the zone"}`}'s admin filter/report data.
+          </p>
         </div>
       )}
 
@@ -729,7 +709,7 @@ export default function OnboardingLocationSection({
           <p className="mt-2 flex items-start gap-1.5 text-xs text-red-600">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
-              Selected location is outside the selected {selectedServiceArea ? "service area" : "service zone"}. Pin a
+              Selected location is outside the selected service zone. Pin a
               location inside the highlighted area.
             </span>
           </p>
@@ -737,7 +717,7 @@ export default function OnboardingLocationSection({
         {pickedFromSuggestion && !locationOutsideZone && (
           <p className="mt-2 flex items-start gap-1.5 text-xs text-emerald-700">
             <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>Location confirmed inside the {selectedServiceArea ? "service area" : "service zone"}.</span>
+            <span>Location confirmed inside the service zone.</span>
           </p>
         )}
         {zoneSelected && !locationOutsideZone && !pickedFromSuggestion && (
@@ -762,7 +742,7 @@ export default function OnboardingLocationSection({
                 </p>
                 <p className="text-[11px] text-slate-500">
                   {selectedServiceArea
-                    ? "Green area shows your selected service area inside the zone. Your pin must be inside it."
+                    ? "Green area shows your selected service area for reference. Your pin just needs to be inside the red zone boundary."
                     : "Red area shows the admin-defined service zone. Your pin must be inside it."}
                 </p>
               </div>
