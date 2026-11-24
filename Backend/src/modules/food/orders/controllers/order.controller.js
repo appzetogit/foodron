@@ -280,6 +280,16 @@ export async function listOrdersRestaurantController(req, res, next) {
     }
 }
 
+export async function getRegularCustomersRestaurantController(req, res, next) {
+    try {
+        const restaurantId = req.user?.userId;
+        const result = await orderService.getRegularCustomersRestaurant(restaurantId, req.query);
+        return sendResponse(res, 200, 'Regular customers retrieved', result);
+    } catch (err) {
+        next(err);
+    }
+}
+
 export async function getOrderByIdRestaurantController(req, res, next) {
     try {
         const restaurantId = req.user?.userId;

@@ -32,6 +32,7 @@ import {
   Crown,
   Wallet,
   Megaphone,
+  Users,
 } from "lucide-react"
 import { Card, CardContent } from "@food/components/ui/card"
 import { DateRangeCalendar } from "@food/components/ui/date-range-calendar"
@@ -735,6 +736,7 @@ export default function ExploreMore() {
     { id: 1, label: "Order history", icon: FileText, route: "/restaurant/orders/all" },
     { id: 2, label: "Complaints", icon: Star, route: "/restaurant/feedback?tab=complaints" },
     { id: 3, label: "Reviews", icon: MessageSquare, route: "/restaurant/feedback" },
+    { id: 4, label: "Regular Customers", icon: Users, route: "/restaurant/customers/regular" },
   ]
 
   const helpItems = [

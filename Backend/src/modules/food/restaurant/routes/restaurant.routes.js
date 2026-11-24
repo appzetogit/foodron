@@ -344,6 +344,7 @@ router.get('/orders', authMiddleware, requireRestaurant, requireApprovedRestaura
 router.get('/orders/:orderId', authMiddleware, requireRestaurant, requireApprovedRestaurant, orderController.getOrderByIdRestaurantController);
 router.patch('/orders/:orderId/status', authMiddleware, requireRestaurant, requireApprovedRestaurant, orderController.updateOrderStatusRestaurantController);
 router.post('/orders/:orderId/resend-notification', authMiddleware, requireRestaurant, requireApprovedRestaurant, orderController.resendDeliveryNotificationRestaurantController);
+router.get('/customers/regular', authMiddleware, requireRestaurant, requireApprovedRestaurant, orderController.getRegularCustomersRestaurantController);
 
 // Complaints (restaurant dashboard)
 router.get('/complaints', authMiddleware, requireRestaurant, requireApprovedRestaurant, getRestaurantComplaintsController);

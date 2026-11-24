@@ -535,6 +535,7 @@ orderSchema.index({ 'payment.method': 1, createdAt: -1 });
 orderSchema.index({ orderStatus: 1, scheduledAt: 1 });
 orderSchema.index({ deliveryMode: 1, createdAt: -1 });
 orderSchema.index({ restaurantId: 1, deliveryMode: 1, createdAt: -1 });
+orderSchema.index({ restaurantId: 1, userId: 1, createdAt: -1 });
 
 const LOCKED_MONEY_PATHS = [
     'pricing.subtotal',

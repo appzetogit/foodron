@@ -4241,6 +4241,72 @@ export async function listOrdersRestaurant(restaurantId, query) {
   return buildPaginatedResult({ docs: sanitizedDocs, total, page, limit });
 }
 
+const CANCELLED_ORDER_STATUSES = [
+  'cancelled_by_user',
+  'cancelled_by_restaurant',
+  'cancelled_by_admin',
+  'cancelled_by_system',
+];
+
+// A customer is "regular" once their current-calendar-month order count at this
+// restaurant reaches 6 (5 completed orders qualify them, surfaced from the 6th).
+const REGULAR_CUSTOMER_THRESHOLD = 6;
+
+/** Restaurant's own regular/repeat customers for the current calendar month. */
+export async function getRegularCustomersRestaurant(restaurantId, query = {}) {
+  const { page, limit, skip } = buildPaginationOptions(query);
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+  const counts = await FoodOrder.aggregate([
+    {
+      $match: {
+        restaurantId: new mongoose.Types.ObjectId(restaurantId),
+        userId: { $ne: null },
+        orderStatus: { $nin: CANCELLED_ORDER_STATUSES },
+        createdAt: { $gte: monthStart, $lt: nextMonthStart },
+      },
+    },
+    {
+      $group: {
+        _id: '$userId',
+        monthlyOrderCount: { $sum: 1 },
+        lastOrderAt: { $max: '$createdAt' },
+      },
+    },
+    { $match: { monthlyOrderCount: { $gte: REGULAR_CUSTOMER_THRESHOLD } } },
+    { $sort: { monthlyOrderCount: -1, lastOrderAt: -1 } },
+  ]);
+
+  const total = counts.length;
+  const pageCounts = counts.slice(skip, skip + limit);
+  const userIds = pageCounts.map((c) => c._id);
+
+  const users = userIds.length
+    ? await FoodUser.find({ _id: { $in: userIds } })
+        .select('name phone email profileImage')
+        .lean()
+    : [];
+  const userMap = new Map(users.map((u) => [String(u._id), u]));
+
+  const customers = pageCounts.map((c) => {
+    const user = userMap.get(String(c._id)) || null;
+    return {
+      userId: String(c._id),
+      name: user?.name || 'N/A',
+      phone: user?.phone || '',
+      email: user?.email || '',
+      profileImage: user?.profileImage || '',
+      monthlyOrderCount: c.monthlyOrderCount,
+      lastOrderAt: c.lastOrderAt,
+    };
+  });
+
+  return buildPaginatedResult({ docs: customers, total, page, limit });
+}
+
 export async function updateOrderStatusRestaurant(
   orderId,
   restaurantId,

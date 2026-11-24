@@ -1581,10 +1581,12 @@ export default function OrdersMain() {
   const [showRejectPopup, setShowRejectPopup] = useState(false);
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [rejectOtherText, setRejectOtherText] = useState("");
   const [isRejectingOrder, setIsRejectingOrder] = useState(false);
 
   const [showCancelPopup, setShowCancelPopup] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [cancelOtherText, setCancelOtherText] = useState("");
   const [orderToCancel, setOrderToCancel] = useState(null);
   const [isCancellingOrder, setIsCancellingOrder] = useState(false);
 
@@ -2018,11 +2020,14 @@ export default function OrdersMain() {
     if (!order) return;
     setRejectTarget(order);
     setRejectReason("");
+    setRejectOtherText("");
     setShowRejectPopup(true);
   }, []);
 
   const handleRejectConfirm = async () => {
-    if (!rejectReason || rejectInFlightRef.current || isRejectingOrder) return;
+    const isOther = rejectReason === "Other reason";
+    const finalReason = isOther ? rejectOtherText.trim() : rejectReason;
+    if (!rejectReason || (isOther && !finalReason) || rejectInFlightRef.current || isRejectingOrder) return;
     if (!rejectTarget) return;
 
     const orderId =
@@ -2037,7 +2042,7 @@ export default function OrdersMain() {
 
     try {
       if (rejectTarget?.orderMongoId || rejectTarget?.orderId) {
-        await restaurantAPI.rejectOrder(orderId, rejectReason);
+        await restaurantAPI.rejectOrder(orderId, finalReason);
         debugLog("? Order rejected:", orderId);
         requestOrdersRefresh();
       }
@@ -2048,6 +2053,7 @@ export default function OrdersMain() {
       setShowRejectPopup(false);
       setRejectTarget(null);
       setRejectReason("");
+      setRejectOtherText("");
     } catch (error) {
       debugError("? Error rejecting order:", error);
       alert("Failed to reject order. Please try again.");
@@ -2062,17 +2068,23 @@ export default function OrdersMain() {
     setShowRejectPopup(false);
     setRejectTarget(null);
     setRejectReason("");
+    setRejectOtherText("");
   };
 
   // Handle cancel order (for preparing orders)
   const handleCancelClick = useCallback((order) => {
     setOrderToCancel(order);
+    setCancelReason("");
+    setCancelOtherText("");
     setShowCancelPopup(true);
   }, []);
 
   const handleCancelConfirm = async () => {
+    const isOther = cancelReason === "Other reason";
+    const finalReason = isOther ? cancelOtherText.trim() : cancelReason.trim();
     if (
-      !cancelReason.trim() ||
+      !cancelReason ||
+      !finalReason ||
       !orderToCancel ||
       cancelInFlightRef.current ||
       isCancellingOrder
@@ -2085,12 +2097,13 @@ export default function OrdersMain() {
 
     try {
       const orderId = orderToCancel.mongoId || orderToCancel.orderId;
-      await restaurantAPI.rejectOrder(orderId, cancelReason.trim());
+      await restaurantAPI.rejectOrder(orderId, finalReason);
       toast.success("Order cancelled successfully");
       requestOrdersRefresh();
       setShowCancelPopup(false);
       setOrderToCancel(null);
       setCancelReason("");
+      setCancelOtherText("");
     } catch (error) {
       debugError("? Error cancelling order:", error);
       toast.error(error.response?.data?.message || "Failed to cancel order");
@@ -2105,6 +2118,7 @@ export default function OrdersMain() {
     setShowCancelPopup(false);
     setOrderToCancel(null);
     setCancelReason("");
+    setCancelOtherText("");
   };
 
   // Toggle mute
@@ -3063,6 +3077,16 @@ case "cancelled":
                       </button>
                     ))}
                   </div>
+                  {rejectReason === "Other reason" && (
+                    <textarea
+                      value={rejectOtherText}
+                      onChange={(e) => setRejectOtherText(e.target.value)}
+                      placeholder="Please specify your reason"
+                      className="mt-3 w-full p-3 rounded-lg border-2 border-gray-200 text-sm focus:outline-none focus:border-black"
+                      rows={3}
+                      autoFocus
+                    />
+                  )}
                 </div>
 
                 {/* Footer */}
@@ -3075,9 +3099,9 @@ case "cancelled":
                   </button>
                   <button
                     onClick={handleRejectConfirm}
-                    disabled={!rejectReason || isRejectingOrder}
+                    disabled={!rejectReason || (rejectReason === "Other reason" && !rejectOtherText.trim()) || isRejectingOrder}
                     className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors ${
-                      rejectReason && !isRejectingOrder
+                      rejectReason && !(rejectReason === "Other reason" && !rejectOtherText.trim()) && !isRejectingOrder
                       ? "!bg-black !text-white"
                       : "bg-gray-200 text-gray-400 cursor-not-allowed"
                       }`}>
@@ -3161,6 +3185,16 @@ case "cancelled":
                       </button>
                     ))}
                   </div>
+                  {cancelReason === "Other reason" && (
+                    <textarea
+                      value={cancelOtherText}
+                      onChange={(e) => setCancelOtherText(e.target.value)}
+                      placeholder="Please specify your reason"
+                      className="mt-3 w-full p-3 rounded-lg border-2 border-gray-200 text-sm focus:outline-none focus:border-red-500"
+                      rows={3}
+                      autoFocus
+                    />
+                  )}
                 </div>
 
                 {/* Footer */}
@@ -3173,9 +3207,9 @@ case "cancelled":
                   </button>
                   <button
                     onClick={handleCancelConfirm}
-                    disabled={!cancelReason || isCancellingOrder}
+                    disabled={!cancelReason || (cancelReason === "Other reason" && !cancelOtherText.trim()) || isCancellingOrder}
                     className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors ${
-                      cancelReason && !isCancellingOrder
+                      cancelReason && !(cancelReason === "Other reason" && !cancelOtherText.trim()) && !isCancellingOrder
                       ? "!bg-red-600 !text-white hover:bg-red-700"
                       : "bg-gray-200 text-gray-400 cursor-not-allowed"
                       }`}>

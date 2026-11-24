@@ -1785,6 +1785,12 @@ export const restaurantAPI = {
       orderStatus: "cancelled_by_restaurant",
       reason: String(_reason || "").trim(),
     }),
+  /** Regular/repeat customers this calendar month (6+ non-cancelled orders). */
+  getRegularCustomers: (params = {}) =>
+    apiClient.get("/food/restaurant/customers/regular", {
+      params,
+      contextModule: "restaurant",
+    }),
   /** Mark order ready (restaurant handoff). */
   markOrderReady: (orderId) =>
     restaurantAPI.updateOrderStatus(orderId, {
