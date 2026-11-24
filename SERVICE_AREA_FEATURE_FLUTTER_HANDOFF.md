@@ -6,6 +6,12 @@ data-filtering/reporting tag** — it does **not** change how orders are dispatc
 restaurant's or driver's zone-based operational flow works, or anything else. Think of it as
 a label: "this restaurant/driver is in Zone X, specifically in Service Area Y of that zone."
 
+**It never restricts where a pin can be placed.** Selecting a service area is always optional,
+and even when one is selected, the restaurant/driver can still place their pin anywhere inside
+the full zone — same as if no service area were selected at all. The only thing selecting a
+service area changes is which polygon is drawn for reference on the map and what tag gets saved
+for the admin panel's filters/reports.
+
 ---
 
 ## 1. Restaurant app — onboarding (new restaurant signup)
@@ -46,13 +52,14 @@ Response:
 - It is never required — a restaurant can leave it unselected and onboarding works exactly as
   before.
 - Draw the selected service area's polygon on the map **on top of** the zone polygon, in a
-  different color (the web app uses green for service area vs. red for zone), so it's clear
-  the pin must land inside the smaller shape, not just anywhere in the zone.
-- If no service area is selected, pin validation stays exactly as it is today (anywhere
-  inside the zone polygon).
-- If a service area **is** selected, the pin must fall inside that polygon specifically — use
-  the exact same point-in-polygon check you already do for the zone (no new library/API
-  needed, it's the same geometry check against a different, smaller polygon).
+  different color (the web app uses green for service area vs. red for zone), purely so the
+  restaurant can see where it is — **this is for reference only, it does NOT restrict the
+  pin.**
+- **Important: pin validation never changes based on service area.** Whether or not a service
+  area is selected, the pin only ever needs to be inside the **zone** polygon — exactly the
+  same check as before this feature existed. Do **not** add a point-in-polygon check against
+  the service-area polygon; the restaurant can place their pin anywhere inside the zone, even
+  if a service area is selected and the pin falls outside that smaller shape.
 
 ### Submit payload — one new optional field
 
@@ -62,15 +69,10 @@ Response:
 serviceAreaId: "664a..."   // optional — omit or send empty string if none selected
 ```
 
-alongside the existing `zoneId` field. If you select a service area but the pin ends up
-outside it, the backend rejects with:
-
-```json
-{ "success": false, "message": "Selected address is outside the selected service area" }
-```
-
-Show this the same way you already show "Selected address is outside the selected zone" —
-same error shape, just a different message string.
+alongside the existing `zoneId` field. This is sent purely as a data tag; it has no effect on
+address/pin validation. The only pin-related rejection you'll ever see is the existing
+"Selected address is outside the selected zone" — there is no separate
+"outside the selected service area" error.
 
 ### Where the restaurant sees it afterward
 
@@ -146,8 +148,8 @@ alongside their city). `serviceAreaName` is empty if none was picked.
 ## 3. Admin-created restaurants/drivers (no Flutter work needed)
 
 When admin manually adds a restaurant or driver from the web panel (not self-onboarding), the
-same `zoneId`/`serviceAreaId` fields are now required there too, with the same containment
-validation. This is admin-web-only — no Flutter changes needed for this part.
+same `zoneId` (required) / `serviceAreaId` (optional, data tag only, no pin restriction) fields
+apply there too. This is admin-web-only — no Flutter changes needed for this part.
 
 ---
 
