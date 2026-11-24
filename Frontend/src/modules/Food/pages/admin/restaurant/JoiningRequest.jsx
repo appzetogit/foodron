@@ -206,12 +206,29 @@ export default function JoiningRequest() {
   const [loadingDetails, setLoadingDetails] = useState(false)
   const [showFilterDialog, setShowFilterDialog] = useState(false)
   const [allZones, setAllZones] = useState([])
+  const [serviceAreas, setServiceAreas] = useState([])
   const [sortConfig, setSortConfig] = useState({ key: "createdAt", direction: "desc" })
   const [filters, setFilters] = useState({
     zone: "",
+    zoneId: "",
+    serviceAreaId: "",
     dateFrom: "",
     dateTo: ""
   })
+
+  // Fetch service areas for the selected zone (optional narrower filter)
+  useEffect(() => {
+    if (!filters.zoneId) {
+      setServiceAreas([])
+      return
+    }
+    adminAPI.getServiceAreas({ zoneId: filters.zoneId })
+      .then((res) => {
+        const list = res?.data?.data?.serviceAreas || []
+        setServiceAreas(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setServiceAreas([]))
+  }, [filters.zoneId])
 
   // Track first render to avoid duplicate fetch in React StrictMode
   const hasFetchedOnceRef = useRef(false)
@@ -262,12 +279,24 @@ export default function JoiningRequest() {
     }
   }, [activeTab])
 
+  // Refetch from backend when the zone/service-area filter changes.
+  useEffect(() => {
+    if (!hasFetchedOnceRef.current) return
+    fetchRequests()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.zoneId, filters.serviceAreaId])
+
   const fetchRequests = async () => {
     try {
       setLoading(true)
       setError(null)
 
-      const response = await adminAPI.getPendingRestaurants()
+      const params = {}
+      if (filters.zoneId) {
+        params.zoneId = filters.zoneId
+        if (filters.serviceAreaId) params.serviceAreaId = filters.serviceAreaId
+      }
+      const response = await adminAPI.getPendingRestaurants(params)
       const list = (response?.data?.data || []).map((request) =>
         normalizeRequestRecord(request),
       )
@@ -323,11 +352,6 @@ export default function JoiningRequest() {
         request.ownerName?.toLowerCase().includes(query) ||
         request.ownerPhone?.includes(query)
       )
-    }
-
-    // Apply zone filter
-    if (filters.zone) {
-      filtered = filtered.filter(request => request.zone === filters.zone)
     }
 
     // Apply date range filter
@@ -390,12 +414,14 @@ export default function JoiningRequest() {
   const clearFilters = () => {
     setFilters({
       zone: "",
+      zoneId: "",
+      serviceAreaId: "",
       dateFrom: "",
       dateTo: ""
     })
   }
 
-  const hasActiveFilters = filters.zone || filters.dateFrom || filters.dateTo
+  const hasActiveFilters = filters.zoneId || filters.dateFrom || filters.dateTo
 
   const handleApprove = async (request) => {
     if (!canEdit) {
@@ -599,7 +625,7 @@ export default function JoiningRequest() {
                 Filter
                 {hasActiveFilters && (
                   <span className="ml-1 px-1.5 py-0.5 bg-blue-600 text-white text-xs rounded-full">
-                    {[filters.zone, filters.dateFrom, filters.dateTo].filter(Boolean).length}
+                    {[filters.zoneId, filters.dateFrom, filters.dateTo].filter(Boolean).length}
                   </span>
                 )}
               </button>
@@ -811,16 +837,34 @@ export default function JoiningRequest() {
                     Zone
                   </label>
                   <select
-                    value={filters.zone}
-                    onChange={(e) => setFilters({ ...filters, zone: e.target.value })}
+                    value={filters.zoneId}
+                    onChange={(e) => setFilters({ ...filters, zoneId: e.target.value, serviceAreaId: "" })}
                     className="w-full px-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="">All Zones</option>
                     {filterOptions.zones.map((z) => (
-                      <option key={z.id} value={z.name}>{z.name}</option>
+                      <option key={z.id} value={z.id}>{z.name}</option>
                     ))}
                   </select>
                 </div>
+
+                {filters.zoneId && serviceAreas.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Service Area
+                    </label>
+                    <select
+                      value={filters.serviceAreaId}
+                      onChange={(e) => setFilters({ ...filters, serviceAreaId: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">All Service Areas</option>
+                      {serviceAreas.map((sa) => (
+                        <option key={sa._id} value={sa._id}>{sa.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {/* Date Range Filters */}
                 <div className="grid grid-cols-2 gap-3">

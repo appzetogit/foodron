@@ -60,8 +60,6 @@ router.patch('/customers/:id/cod-access', checkPermission('food::customer_manage
 router.patch('/customers/cod-access/bulk', checkPermission('food::customer_management::customers', 'edit'), adminController.bulkUpdateCustomersCodAccess);
 
 // ----- Customer Role Requests -----
-router.get('/customer-role-requests', checkPermission('food::customer_management::customers', 'view'), adminController.getCustomerRoleRequests);
-router.patch('/customer-role-requests/:id/status', checkPermission('food::customer_management::customers', 'edit'), adminController.updateCustomerRoleRequestStatus);
 
 // ----- Safety / Emergency Reports -----
 router.get('/safety-emergency-reports', checkPermission('food::help_support::safety_reports', 'view'), adminController.getSafetyEmergencyReports);

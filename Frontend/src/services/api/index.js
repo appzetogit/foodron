@@ -358,8 +358,9 @@ export const adminAPI = {
     return authService.logoutAll(token, fcmToken, "web");
   },
   // Restaurant approvals and join requests
-  getPendingRestaurants: () =>
+  getPendingRestaurants: (params = {}) =>
     apiClient.get("/food/admin/restaurants/pending", {
+      params,
       contextModule: "admin",
     }),
   /** List restaurant complaints (admin). */
@@ -1239,12 +1240,6 @@ export const adminAPI = {
       contextModule: "admin",
     });
   },
-  /** GET /food/admin/customer-role-requests (Bearer ADMIN) */
-  getCustomerRoleRequests: () =>
-    apiClient.get("/food/admin/customer-role-requests", { contextModule: "admin" }),
-  /** PATCH /food/admin/customer-role-requests/:id/status (Bearer ADMIN) */
-  updateCustomerRoleRequestStatus: (id, status) =>
-    apiClient.patch(`/food/admin/customer-role-requests/${id}/status`, { status }, { contextModule: "admin" }),
   getRestaurantCoupons: () =>
     apiClient.get("/food/admin/restaurant-coupons", { contextModule: "admin" }),
   updateRestaurantCouponStatus: (id, status) =>

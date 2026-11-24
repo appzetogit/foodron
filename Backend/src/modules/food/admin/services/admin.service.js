@@ -4018,15 +4018,22 @@ export async function getRestaurantItemSlotTimingsForMenu(restaurantId) {
     return listRestaurantItemSlotTimings(String(restaurantId));
 }
 
-export async function getPendingRestaurants() {
-    const restaurants = await FoodRestaurant.find({
+export async function getPendingRestaurants(query = {}) {
+    const filter = {
         $or: [
             { status: { $in: ['pending', 'rejected'] } },
             // Already-approved restaurants with staged changes awaiting review.
             { 'pendingOpenDays.hasPendingUpdate': true },
             { 'pendingProfileChanges.hasPendingUpdate': true },
         ]
-    })
+    };
+    if (query.zoneId && mongoose.Types.ObjectId.isValid(String(query.zoneId))) {
+        filter.zoneId = new mongoose.Types.ObjectId(String(query.zoneId));
+    }
+    if (query.serviceAreaId && mongoose.Types.ObjectId.isValid(String(query.serviceAreaId))) {
+        filter.serviceAreaId = new mongoose.Types.ObjectId(String(query.serviceAreaId));
+    }
+    const restaurants = await FoodRestaurant.find(filter)
         .populate('zoneId', 'name zoneName serviceLocation')
         .sort({ createdAt: -1 })
         .lean();
@@ -6479,9 +6486,16 @@ export async function expireExpiredOffers() {
 }
 // ----- Delivery join requests -----
 export async function getDeliveryJoinRequests(query) {
-    const { status = 'pending', page = 1, limit = 1000, search, zone, vehicleType, serviceAreaId } = query;
+    const { status = 'pending', page = 1, limit = 1000, search, zone, zoneId, vehicleType, serviceAreaId } = query;
     const filter = {};
     const requestedStatus = String(status || 'pending').trim().toLowerCase();
+
+    if (zoneId && mongoose.Types.ObjectId.isValid(String(zoneId))) {
+        filter.zoneId = new mongoose.Types.ObjectId(String(zoneId));
+    }
+    if (serviceAreaId && mongoose.Types.ObjectId.isValid(String(serviceAreaId))) {
+        filter.serviceAreaId = new mongoose.Types.ObjectId(String(serviceAreaId));
+    }
 
     if (requestedStatus === 'pending') filter.status = 'pending';
     else if (requestedStatus === 'denied' || requestedStatus === 'rejected') filter.status = 'rejected';
@@ -6581,10 +6595,6 @@ export async function getDeliveryJoinRequests(query) {
     if (zone && zone.trim()) {
         const zTerm = zone.trim().toLowerCase();
         requests = requests.filter((r) => r.detectedZoneName.toLowerCase().includes(zTerm));
-    }
-    if (serviceAreaId && String(serviceAreaId).trim()) {
-        const saTerm = String(serviceAreaId).trim();
-        requests = requests.filter((r) => String(r.serviceAreaId || '') === saTerm);
     }
 
     const totalCount = requests.length;

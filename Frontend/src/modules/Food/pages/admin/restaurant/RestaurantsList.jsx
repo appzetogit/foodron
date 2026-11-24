@@ -295,7 +295,11 @@ export default function RestaurantsList() {
         setLoading(true)
         setError(null)
 
-        const response = await adminAPI.getApprovedRestaurants({})
+        const response = await adminAPI.getApprovedRestaurants(
+          listZoneId
+            ? { zoneId: listZoneId, ...(listServiceAreaId ? { serviceAreaId: listServiceAreaId } : {}) }
+            : {}
+        )
 
         if (cancelled) return
 
@@ -379,7 +383,7 @@ export default function RestaurantsList() {
 
     fetchRestaurants()
     return () => { cancelled = true }
-  }, [])
+  }, [listZoneId, listServiceAreaId])
 
   const [searchParams] = useSearchParams()
   const restaurantIdFromUrl = searchParams.get("restaurantId")
@@ -395,8 +399,34 @@ export default function RestaurantsList() {
 
   const [filters, setFilters] = useState({
     all: "All",
-    zone: "",
   })
+  const [listZones, setListZones] = useState([])
+  const [listZoneId, setListZoneId] = useState("")
+  const [listServiceAreas, setListServiceAreas] = useState([])
+  const [listServiceAreaId, setListServiceAreaId] = useState("")
+
+  useEffect(() => {
+    adminAPI.getZones({ limit: 1000, isActive: true, view: "summary" })
+      .then((res) => {
+        const list = res?.data?.data?.zones || []
+        setListZones(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setListZones([]))
+  }, [])
+
+  // Fetch service areas for the selected zone (optional narrower filter)
+  useEffect(() => {
+    if (!listZoneId) {
+      setListServiceAreas([])
+      return
+    }
+    adminAPI.getServiceAreas({ zoneId: listZoneId })
+      .then((res) => {
+        const list = res?.data?.data?.serviceAreas || []
+        setListServiceAreas(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setListServiceAreas([]))
+  }, [listZoneId])
 
   const filteredRestaurants = useMemo(() => {
     let result = [...restaurants]
@@ -416,10 +446,6 @@ export default function RestaurantsList() {
       } else if (filters.all === "Inactive") {
         result = result.filter(restaurant => restaurant.isActive !== true)
       }
-    }
-
-    if (filters.zone) {
-      result = result.filter(restaurant => restaurant.zone === filters.zone)
     }
 
     // Apply Sorting
@@ -1634,6 +1660,30 @@ export default function RestaurantsList() {
                 />
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               </div>
+
+              <select
+                value={listZoneId}
+                onChange={(e) => { setListZoneId(e.target.value); setListServiceAreaId("") }}
+                className="px-3 py-2.5 text-sm rounded-lg border border-slate-300 bg-white"
+              >
+                <option value="">All Zones</option>
+                {listZones.map((zone) => (
+                  <option key={zone._id} value={zone._id}>{zone.zoneName || zone.name}</option>
+                ))}
+              </select>
+
+              {listZoneId && listServiceAreas.length > 0 && (
+                <select
+                  value={listServiceAreaId}
+                  onChange={(e) => setListServiceAreaId(e.target.value)}
+                  className="px-3 py-2.5 text-sm rounded-lg border border-slate-300 bg-white"
+                >
+                  <option value="">All Service Areas</option>
+                  {listServiceAreas.map((sa) => (
+                    <option key={sa._id} value={sa._id}>{sa.name}</option>
+                  ))}
+                </select>
+              )}
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

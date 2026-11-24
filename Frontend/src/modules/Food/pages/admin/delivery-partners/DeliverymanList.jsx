@@ -71,6 +71,10 @@ export default function DeliverymanList() {
   }, [currentUser, resolvedPermissions])
 
   const [searchQuery, setSearchQuery] = useState("")
+  const [zoneId, setZoneId] = useState("")
+  const [serviceAreaId, setServiceAreaId] = useState("")
+  const [zones, setZones] = useState([])
+  const [serviceAreas, setServiceAreas] = useState([])
   const [page, setPage] = useState(1)
   const [pagination, setPagination] = useState({
     page: 1,
@@ -119,6 +123,10 @@ export default function DeliverymanList() {
       }
       if (nextSearch.trim()) {
         params.search = nextSearch.trim()
+      }
+      if (zoneId) {
+        params.zoneId = zoneId
+        if (serviceAreaId) params.serviceAreaId = serviceAreaId
       }
 
       const [partnersResponse, walletsResponse] = await Promise.allSettled([
@@ -195,7 +203,7 @@ export default function DeliverymanList() {
     } finally {
       if (seq === fetchSeqRef.current) setLoading(false)
     }
-  }, [page, searchQuery])
+  }, [page, searchQuery, zoneId, serviceAreaId])
 
   // One fetch path only — avoids mount + search double-call.
   useEffect(() => {
@@ -204,9 +212,32 @@ export default function DeliverymanList() {
       fetchDeliverymen({ page, search: searchQuery })
     }, delay)
     return () => clearTimeout(timer)
-    // fetchDeliverymen closes over page/search; depend on those primitives only.
+    // fetchDeliverymen closes over page/search/zoneId/serviceAreaId; depend on those primitives only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, searchQuery])
+  }, [page, searchQuery, zoneId, serviceAreaId])
+
+  useEffect(() => {
+    adminAPI.getZones({ limit: 1000, isActive: true, view: "summary" })
+      .then((res) => {
+        const list = res?.data?.data?.zones || []
+        setZones(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setZones([]))
+  }, [])
+
+  // Fetch service areas for the selected zone (optional narrower filter)
+  useEffect(() => {
+    if (!zoneId) {
+      setServiceAreas([])
+      return
+    }
+    adminAPI.getServiceAreas({ zoneId })
+      .then((res) => {
+        const list = res?.data?.data?.serviceAreas || []
+        setServiceAreas(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setServiceAreas([]))
+  }, [zoneId])
 
   const filteredDeliverymen = useMemo(() => {
     return deliverymen
@@ -480,6 +511,30 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                 />
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               </div>
+
+              <select
+                value={zoneId}
+                onChange={(e) => { setZoneId(e.target.value); setServiceAreaId(""); setPage(1) }}
+                className="px-3 py-2.5 text-sm rounded-lg border border-slate-300 bg-white"
+              >
+                <option value="">All Zones</option>
+                {zones.map((zone) => (
+                  <option key={zone._id} value={zone._id}>{zone.zoneName || zone.name}</option>
+                ))}
+              </select>
+
+              {zoneId && serviceAreas.length > 0 && (
+                <select
+                  value={serviceAreaId}
+                  onChange={(e) => { setServiceAreaId(e.target.value); setPage(1) }}
+                  className="px-3 py-2.5 text-sm rounded-lg border border-slate-300 bg-white"
+                >
+                  <option value="">All Service Areas</option>
+                  {serviceAreas.map((sa) => (
+                    <option key={sa._id} value={sa._id}>{sa.name}</option>
+                  ))}
+                </select>
+              )}
 
               <button
                 onClick={handleExportPDF}
