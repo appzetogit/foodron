@@ -13,6 +13,7 @@ import {
     serializeCategoryForResponse,
     toObjectId
 } from '../../shared/categoryWorkflow.js';
+import { serializeSubCategoryForResponse, syncCategorySubCategories } from '../../shared/subCategoryWorkflow.js';
 
 const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const APPROVED_CATEGORY_FILTER = [
@@ -152,13 +153,29 @@ export async function listRestaurantCategories(restaurantId, query = {}) {
         }))
         : list;
 
-    const categories = hydratedList.map((category) =>
-        serializeCategoryForResponse(category, {
+    const { FoodSubCategory } = await import('../../admin/models/subcategory.model.js');
+    const activeCategoryIds = list.filter((c) => c.isActive !== false).map((c) => c._id);
+    const allSubCategories = activeCategoryIds.length
+        ? await FoodSubCategory.find({ categoryId: { $in: activeCategoryIds }, isActive: { $ne: false } })
+            .sort({ sortOrder: 1, createdAt: 1 })
+            .select('name categoryId approvalStatus isApproved sortOrder')
+            .lean()
+        : [];
+    const subCategoriesByCategoryId = new Map();
+    for (const sub of allSubCategories) {
+        const key = String(sub.categoryId);
+        if (!subCategoriesByCategoryId.has(key)) subCategoriesByCategoryId.set(key, []);
+        subCategoriesByCategoryId.get(key).push(serializeSubCategoryForResponse(sub));
+    }
+
+    const categories = hydratedList.map((category) => ({
+        ...serializeCategoryForResponse(category, {
             currentRestaurantId: restaurantId,
             includeCounts: withCounts || !compact,
             statsById
-        })
-    );
+        }),
+        subCategories: subCategoriesByCategoryId.get(String(category._id)) || []
+    }));
 
     return { categories, total, page, limit };
 }
@@ -371,6 +388,13 @@ export async function createRestaurantCategory(restaurantId, body = {}) {
     });
     await doc.save();
 
+    await syncCategorySubCategories(doc._id, body.subCategoryNames, {
+        approvalStatus: 'pending',
+        isApproved: false,
+        restaurantId: context.restaurantId,
+        createdByRestaurantId: context.restaurantId
+    });
+
     try {
         const { notifyAdminsSafely } = await import('../../../../core/notifications/firebase.service.js');
         void notifyAdminsSafely({
@@ -460,6 +484,10 @@ export async function updateRestaurantCategory(restaurantId, id, body = {}) {
         }
     }
 
+    if (body.subCategoryNames !== undefined) {
+        needsApproval = true;
+    }
+
     if (needsApproval) {
         doc.createdByRestaurantId = doc.createdByRestaurantId || context.restaurantId;
         doc.approvalStatus = 'pending';
@@ -471,6 +499,16 @@ export async function updateRestaurantCategory(restaurantId, id, body = {}) {
     }
 
     await doc.save();
+
+    if (body.subCategoryNames !== undefined) {
+        await syncCategorySubCategories(doc._id, body.subCategoryNames, {
+            approvalStatus: doc.approvalStatus,
+            isApproved: doc.isApproved,
+            restaurantId: doc.restaurantId,
+            createdByRestaurantId: doc.createdByRestaurantId
+        });
+    }
+
     return doc.toObject();
 }
 
@@ -499,11 +537,16 @@ export async function deleteRestaurantCategory(restaurantId, id) {
                 $set: {
                     isAvailable: false,
                     categoryId: null,
-                    categoryName: ''
+                    categoryName: '',
+                    subCategoryId: null,
+                    subCategoryName: ''
                 }
             }
         );
     }
+
+    const { FoodSubCategory } = await import('../../admin/models/subcategory.model.js');
+    await FoodSubCategory.deleteMany({ categoryId: id });
 
     const deleted = await FoodCategory.findOneAndDelete({ _id: id, restaurantId: context.restaurantId }).lean();
     if (!deleted) return null;

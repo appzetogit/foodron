@@ -108,7 +108,7 @@ export async function runBulkMenuImportJob(jobId) {
         const images = new Map(parsed.images);
         const uploadImage = createImageUploader(images);
         const context = await getRestaurantContext(restaurantId);
-        const caches = { categoryCache: new Map(), slotCache: new Map() };
+        const caches = { categoryCache: new Map(), subCategoryCache: new Map(), slotCache: new Map() };
         const foodOffset = 0;
         const addonOffset = job.validation?.food?.total || 0;
 

@@ -28,7 +28,10 @@ const upsertSchema = z.object({
     zoneId: z.string().max(100).optional(),
     status: z.boolean().optional(),
     isActive: z.boolean().optional(),
-    sortOrder: z.coerce.number().int().min(1, 'Display order must be 1 or greater').optional()
+    sortOrder: z.coerce.number().int().min(1, 'Display order must be 1 or greater').optional(),
+    // Optional subcategory names for this category. Omit the field to leave subcategories
+    // untouched; send [] to clear all of them.
+    subCategoryNames: z.array(z.string().max(200)).max(50).optional()
 });
 
 const rejectSchema = z.object({

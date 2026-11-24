@@ -81,6 +81,12 @@ import {
     serializeCategoryForResponse
 } from '../../shared/categoryWorkflow.js';
 import {
+    applyCategoryApprovalToSubCategories,
+    listSubCategoriesForCategory,
+    serializeSubCategoryForResponse,
+    syncCategorySubCategories
+} from '../../shared/subCategoryWorkflow.js';
+import {
     extractRawFoodVariants,
     getFoodDisplayPrice,
     hasFoodVariants,
@@ -4417,7 +4423,25 @@ export async function getCategories(query) {
         restaurantId: category?.restaurantId ? restaurantMap.get(String(category.restaurantId)) || category.restaurantId : category.restaurantId,
         createdByRestaurantId: category?.createdByRestaurantId ? restaurantMap.get(String(category.createdByRestaurantId)) || category.createdByRestaurantId : category.createdByRestaurantId
     }));
-    const categories = hydratedList.map((category) => serializeCategoryForResponse(category, { includeCounts: true, statsById }));
+
+    const { FoodSubCategory } = await import('../models/subcategory.model.js');
+    const allSubCategories = list.length
+        ? await FoodSubCategory.find({ categoryId: { $in: list.map((c) => c._id) } })
+            .sort({ sortOrder: 1, createdAt: 1 })
+            .select('name categoryId approvalStatus isApproved sortOrder')
+            .lean()
+        : [];
+    const subCategoriesByCategoryId = new Map();
+    for (const sub of allSubCategories) {
+        const key = String(sub.categoryId);
+        if (!subCategoriesByCategoryId.has(key)) subCategoriesByCategoryId.set(key, []);
+        subCategoriesByCategoryId.get(key).push(serializeSubCategoryForResponse(sub));
+    }
+
+    const categories = hydratedList.map((category) => ({
+        ...serializeCategoryForResponse(category, { includeCounts: true, statsById }),
+        subCategories: subCategoriesByCategoryId.get(String(category._id)) || []
+    }));
 
     return { categories, total, page, limit };
 }
@@ -4460,6 +4484,14 @@ export async function createCategory(body) {
         createdByRestaurantId: undefined
     });
     await doc.save();
+
+    await syncCategorySubCategories(doc._id, body.subCategoryNames, {
+        approvalStatus: 'approved',
+        isApproved: true,
+        restaurantId: undefined,
+        createdByRestaurantId: undefined
+    });
+
     return doc.toObject();
 }
 
@@ -4477,6 +4509,8 @@ export async function approveCategory(id) {
     doc.rejectedAt = undefined;
     doc.rejectionReason = '';
     await doc.save();
+
+    await applyCategoryApprovalToSubCategories(doc._id, { approvalStatus: 'approved', isApproved: true });
 
     const restaurantId = doc.restaurantId || doc.createdByRestaurantId;
     if (restaurantId) {
@@ -4523,6 +4557,8 @@ export async function rejectCategory(id, reason) {
     doc.rejectedAt = new Date();
     doc.approvedAt = undefined;
     await doc.save();
+
+    await applyCategoryApprovalToSubCategories(doc._id, { approvalStatus: 'rejected', isApproved: false, rejectionReason });
 
     const restaurantId = doc.restaurantId || doc.createdByRestaurantId;
     if (restaurantId) {
@@ -4641,6 +4677,15 @@ export async function updateCategory(id, body) {
 
     await doc.save();
 
+    if (body.subCategoryNames !== undefined) {
+        await syncCategorySubCategories(doc._id, body.subCategoryNames, {
+            approvalStatus: doc.approvalStatus,
+            isApproved: doc.isApproved,
+            restaurantId: doc.restaurantId,
+            createdByRestaurantId: doc.createdByRestaurantId
+        });
+    }
+
     const nextIsActive = doc.isActive !== false;
     if (previousIsActive !== nextIsActive) {
         await notifyCategoryStatusChange(doc, { isActive: nextIsActive });
@@ -4685,6 +4730,9 @@ export async function deleteCategory(id) {
             })
         );
     }
+
+    const { FoodSubCategory } = await import('../models/subcategory.model.js');
+    await FoodSubCategory.deleteMany({ categoryId: id });
 
     const deleted = await FoodCategory.findByIdAndDelete(id).lean();
     return deleted ? { id } : null;
@@ -5172,6 +5220,44 @@ const resolveAdminFoodCategory = async ({ categoryId, categoryName, foodType, pu
     };
 };
 
+/** Required only when the category actually has at least one active subcategory. */
+const resolveFoodSubCategory = async ({ categoryId, subCategoryId, subCategoryName }) => {
+    const { FoodSubCategory } = await import('../models/subcategory.model.js');
+    const categoryHasSubCategories = categoryId
+        ? (await FoodSubCategory.countDocuments({ categoryId, isActive: { $ne: false } })) > 0
+        : false;
+
+    if (!subCategoryId && typeof subCategoryName === 'string' && subCategoryName.trim()) {
+        const match = await FoodSubCategory.findOne({
+            categoryId,
+            name: { $regex: new RegExp(`^${subCategoryName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+            isActive: { $ne: false }
+        }).select('_id name').lean();
+        if (match) {
+            return { subCategoryId: match._id, subCategoryName: match.name };
+        }
+    }
+
+    if (!subCategoryId) {
+        if (categoryHasSubCategories) {
+            throw new ValidationError('This category has subcategories — please select one');
+        }
+        return { subCategoryId: null, subCategoryName: '' };
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(String(subCategoryId))) {
+        throw new ValidationError('Invalid subcategory id');
+    }
+    const doc = await FoodSubCategory.findById(subCategoryId).select('name categoryId isActive').lean();
+    if (!doc || doc.isActive === false) {
+        throw new ValidationError('Subcategory not found');
+    }
+    if (String(doc.categoryId) !== String(categoryId)) {
+        throw new ValidationError('Subcategory does not belong to the selected category');
+    }
+    return { subCategoryId: doc._id, subCategoryName: doc.name };
+};
+
 const getAdminFoodCreatePricing = (body = {}) => {
     const variants = normalizeFoodVariantsInput(extractRawFoodVariants(body));
     if (variants.length > 0) {
@@ -5305,10 +5391,18 @@ export async function createFood(body) {
         pureVegRestaurant: restaurant.pureVegRestaurant === true
     });
 
+    const { subCategoryId, subCategoryName } = await resolveFoodSubCategory({
+        categoryId,
+        subCategoryId: body.subCategoryId,
+        subCategoryName: body.subCategoryName
+    });
+
     const doc = new FoodItem({
         restaurantId,
         categoryId,
         categoryName: resolvedCategoryName,
+        subCategoryId,
+        subCategoryName,
         name,
         description: typeof body.description === 'string' ? body.description.trim() : '',
         price,
@@ -5384,6 +5478,16 @@ export async function updateFood(id, body) {
         });
         doc.categoryId = categoryId;
         doc.categoryName = categoryName;
+    }
+
+    if (body.subCategoryId !== undefined || body.subCategoryName !== undefined) {
+        const { subCategoryId, subCategoryName } = await resolveFoodSubCategory({
+            categoryId: doc.categoryId,
+            subCategoryId: body.subCategoryId,
+            subCategoryName: body.subCategoryName
+        });
+        doc.subCategoryId = subCategoryId;
+        doc.subCategoryName = subCategoryName;
     }
 
     await doc.save();

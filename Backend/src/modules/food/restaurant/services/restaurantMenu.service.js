@@ -45,6 +45,21 @@ const buildMenuFromFoods = async (foods = [], filterPublicOnly = false, options 
     }
     const categoryMap = new Map(categoryDocs.map((doc) => [String(doc._id), doc]));
 
+    const subCategoryIds = Array.from(
+        new Set(
+            (foods || [])
+                .map((food) => (food?.subCategoryId ? String(food.subCategoryId) : ''))
+                .filter((value) => mongoose.Types.ObjectId.isValid(value))
+        )
+    );
+    const { FoodSubCategory } = await import('../../admin/models/subcategory.model.js');
+    const subCategoryDocs = subCategoryIds.length
+        ? await FoodSubCategory.find({ _id: { $in: subCategoryIds }, isActive: { $ne: false } })
+            .select('name categoryId sortOrder')
+            .lean()
+        : [];
+    const subCategoryMap = new Map(subCategoryDocs.map((doc) => [String(doc._id), doc]));
+
     const allowedCategories = new Set();
     if (filterPublicOnly) {
         for (const doc of categoryDocs) {
@@ -72,19 +87,25 @@ const buildMenuFromFoods = async (foods = [], filterPublicOnly = false, options 
                 name: sectionName,
                 image: categoryDoc?.image || '',
                 sortOrder: Number.isFinite(Number(categoryDoc?.sortOrder)) ? Number(categoryDoc.sortOrder) : Number.MAX_SAFE_INTEGER,
-                items: []
+                items: [],
+                bySubCategory: new Map()
             });
         }
 
         const slotId = food?.itemSlotTimingId ? String(food.itemSlotTimingId) : '';
         const slotDoc = slotId ? slotMap.get(slotId) : null;
 
-        byCategory.get(groupKey).items.push({
+        const subCategoryId = food?.subCategoryId ? String(food.subCategoryId) : '';
+        const subCategoryDoc = subCategoryId ? subCategoryMap.get(subCategoryId) : null;
+
+        const itemPayload = {
             id: String(food._id),
             _id: food._id,
             categoryId: categoryId || null,
             categoryName: sectionName,
             category: sectionName,
+            subCategoryId: subCategoryDoc ? subCategoryId : null,
+            subCategoryName: subCategoryDoc?.name || '',
             hasValidCategory: Boolean(categoryDoc),
             needsCategoryAssignment: !categoryDoc,
             name: food.name,
@@ -108,28 +129,61 @@ const buildMenuFromFoods = async (foods = [], filterPublicOnly = false, options 
             isSlotActive: slotDoc ? isFoodVisibleForSlotTiming(food, slotMap, referenceDate) : true,
             createdAt: food.createdAt,
             updatedAt: food.updatedAt
-        });
+        };
+
+        const group = byCategory.get(groupKey);
+        if (subCategoryDoc) {
+            if (!group.bySubCategory.has(subCategoryId)) {
+                group.bySubCategory.set(subCategoryId, {
+                    id: subCategoryId,
+                    name: subCategoryDoc.name,
+                    sortOrder: Number.isFinite(Number(subCategoryDoc.sortOrder)) ? Number(subCategoryDoc.sortOrder) : Number.MAX_SAFE_INTEGER,
+                    items: []
+                });
+            }
+            group.bySubCategory.get(subCategoryId).items.push(itemPayload);
+        } else {
+            group.items.push(itemPayload);
+        }
     }
+
+    const sortByCreatedDesc = (a, b) => {
+        const at = new Date(a.createdAt || a.requestedAt || 0).getTime();
+        const bt = new Date(b.createdAt || b.requestedAt || 0).getTime();
+        return bt - at;
+    };
 
     const orderedGroups = Array.from(byCategory.values()).sort((a, b) => {
         if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
         return String(a.name || '').localeCompare(String(b.name || ''));
     });
 
-    const sections = orderedGroups.map((group, idx) => ({
-        id: group.id || `section-${idx}`,
-        categoryId: group.id || null,
-        name: group.name,
-        image: group.image || '',
-        sortOrder: Number.isFinite(Number(group.sortOrder)) ? Number(group.sortOrder) : 0,
-        itemCount: group.items.length,
-        items: group.items.sort((a, b) => {
-            const at = new Date(a.createdAt || a.requestedAt || 0).getTime();
-            const bt = new Date(b.createdAt || b.requestedAt || 0).getTime();
-            return bt - at;
-        }),
-        subsections: []
-    }));
+    const sections = orderedGroups.map((group, idx) => {
+        const subsections = Array.from(group.bySubCategory.values())
+            .sort((a, b) => {
+                if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+                return String(a.name || '').localeCompare(String(b.name || ''));
+            })
+            .map((sub) => ({
+                id: sub.id,
+                subCategoryId: sub.id,
+                name: sub.name,
+                itemCount: sub.items.length,
+                items: sub.items.sort(sortByCreatedDesc)
+            }));
+        const subItemCount = subsections.reduce((sum, sub) => sum + sub.itemCount, 0);
+
+        return {
+            id: group.id || `section-${idx}`,
+            categoryId: group.id || null,
+            name: group.name,
+            image: group.image || '',
+            sortOrder: Number.isFinite(Number(group.sortOrder)) ? Number(group.sortOrder) : 0,
+            itemCount: group.items.length + subItemCount,
+            items: group.items.sort(sortByCreatedDesc),
+            subsections
+        };
+    });
 
     const categories = sections.map((section) => ({
         id: section.categoryId || section.id,

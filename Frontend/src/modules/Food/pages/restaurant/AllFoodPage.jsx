@@ -26,6 +26,7 @@ export default function AllFoodPage() {
   const [showFilterModal, setShowFilterModal] = useState(false)
   const [foodTypeFilter, setFoodTypeFilter] = useState("all")
   const [stockFilter, setStockFilter] = useState("all")
+  const [subCategoryFilter, setSubCategoryFilter] = useState("all")
   const [allFoods, setAllFoods] = useState([])
 
   // Lenis smooth scrolling
@@ -55,6 +56,11 @@ export default function AllFoodPage() {
       setActiveCategory(categoryParam)
     }
   }, [searchParams])
+
+  // A different category has a different subcategory list, so any previous selection is stale.
+  useEffect(() => {
+    setSubCategoryFilter("all")
+  }, [activeCategory])
 
   // Load foods and listen for updates
   useEffect(() => {
@@ -123,28 +129,47 @@ export default function AllFoodPage() {
     reviews: food.reviews || 0
   }))
 
-  // Filter foods based on category, search, food type, and stock
+  // Subcategories available under the active category (for the filter modal)
+  const subCategoriesForActiveCategory = Array.from(
+    new Set(
+      transformedFoods
+        .filter((food) =>
+          activeCategory === "All" ||
+          food.category?.toLowerCase() === activeCategory.toLowerCase() ||
+          food.category === activeCategory
+        )
+        .map((food) => food.subsectionName || food.subCategoryName || "")
+        .filter(Boolean)
+    )
+  )
+
+  // Filter foods based on category, search, food type, stock, and subcategory
   const filteredFoods = transformedFoods.filter(food => {
-    const matchesCategory = activeCategory === "All" || 
+    const matchesCategory = activeCategory === "All" ||
       food.category?.toLowerCase() === activeCategory.toLowerCase() ||
       food.category === activeCategory
     const matchesSearch = food.name.toLowerCase().includes(searchQuery.toLowerCase())
-    
+
     // Food type filter
-    const matchesFoodType = foodTypeFilter === "all" || 
+    const matchesFoodType = foodTypeFilter === "all" ||
       (foodTypeFilter === "veg" && food.foodType === "Veg") ||
       (foodTypeFilter === "nonVeg" && food.foodType === "Non-Veg")
-    
+
     // Stock filter
     const matchesStock = stockFilter === "all" ||
       (stockFilter === "outOfStock" && (food.stock === 0 || food.stock === "Out of Stock"))
-    
-    return matchesCategory && matchesSearch && matchesFoodType && matchesStock
+
+    // Subcategory filter (only meaningful when the active category actually has any)
+    const matchesSubCategory = subCategoryFilter === "all" ||
+      (food.subsectionName || food.subCategoryName || "") === subCategoryFilter
+
+    return matchesCategory && matchesSearch && matchesFoodType && matchesStock && matchesSubCategory
   })
 
   const handleClearFilter = () => {
     setFoodTypeFilter("all")
     setStockFilter("all")
+    setSubCategoryFilter("all")
   }
 
   const handleApplyFilter = () => {
@@ -430,6 +455,42 @@ export default function AllFoodPage() {
                     </label>
                   </div>
                 </div>
+
+                {/* Subcategory Section (only when the active category has any) */}
+                {subCategoriesForActiveCategory.length > 0 && (
+                  <>
+                    <div className="border-t border-gray-200 mb-6" />
+                    <div className="mb-6">
+                      <h3 className="text-base font-bold text-gray-900 mb-4">Subcategory</h3>
+                      <div className="space-y-3">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="subCategory"
+                            value="all"
+                            checked={subCategoryFilter === "all"}
+                            onChange={(e) => setSubCategoryFilter(e.target.value)}
+                            className="w-5 h-5 text-[#ff8100] border-gray-300 focus:ring-[#ff8100] focus:ring-2"
+                          />
+                          <span className="text-sm text-gray-700">All</span>
+                        </label>
+                        {subCategoriesForActiveCategory.map((subName) => (
+                          <label key={subName} className="flex items-center gap-3 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="subCategory"
+                              value={subName}
+                              checked={subCategoryFilter === subName}
+                              onChange={(e) => setSubCategoryFilter(e.target.value)}
+                              className="w-5 h-5 text-[#ff8100] border-gray-300 focus:ring-[#ff8100] focus:ring-2"
+                            />
+                            <span className="text-sm text-gray-700">{subName}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Action Buttons */}

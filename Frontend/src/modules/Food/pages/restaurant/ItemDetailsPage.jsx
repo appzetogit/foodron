@@ -100,7 +100,7 @@ export default function ItemDetailsPage() {
   const [itemName, setItemName] = useState("")
   const [category, setCategory] = useState(defaultCategory)
   const [selectedCategoryId, setSelectedCategoryId] = useState(defaultCategoryId)
-  const [subCategory, setSubCategory] = useState("")
+  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState("")
   const [servesInfo, setServesInfo] = useState("")
   const [itemSizeQuantity, setItemSizeQuantity] = useState("")
   const [itemSizeUnit, setItemSizeUnit] = useState("piece")
@@ -358,7 +358,7 @@ export default function ItemDetailsPage() {
     setItemName(item.name || "")
     setCategory(item.category || item.categoryName || defaultCategory)
     setSelectedCategoryId(item.categoryId || "")
-    setSubCategory(item.subCategory || item.category || item.categoryName || "Starters")
+    setSelectedSubCategoryId(String(item.subCategoryId || "").trim())
     setServesInfo(item.servesInfo || "")
     setItemSizeQuantity(item.itemSizeQuantity || "")
     setItemSizeUnit(item.itemSizeUnit || "piece")
@@ -489,12 +489,12 @@ export default function ItemDetailsPage() {
         setLoadingCategories(true)
         const response = await restaurantAPI.getCategories()
         if (response.data.success && response.data.data.categories) {
-          // Format categories for the UI - flat list, no subcategories
           const formattedCategories = response.data.data.categories.map(cat => ({
             id: cat._id || cat.id,
             name: cat.name,
             foodTypeScope: cat.foodTypeScope || "Veg",
             isGlobal: Boolean(cat.isGlobal),
+            subCategories: Array.isArray(cat.subCategories) ? cat.subCategories : [],
           }))
 
           debugLog('Formatted restaurant categories:', formattedCategories)
@@ -838,11 +838,11 @@ export default function ItemDetailsPage() {
     setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length)
   }
 
-  const handleCategorySelect = (catId, subCat) => {
+  const handleCategorySelect = (catId) => {
     const selectedCategory = selectableCategories.find(c => c.id === catId)
     setSelectedCategoryId(selectedCategory?.id || "")
     setCategory(selectedCategory?.name || "")
-    setSubCategory(subCat)
+    setSelectedSubCategoryId("")
     if (!canSelectNonVegFoodType({
       pureVegRestaurant: isPureVegRestaurant,
       categoryFoodTypeScope: selectedCategory?.foodTypeScope,
@@ -920,6 +920,10 @@ export default function ItemDetailsPage() {
       }
     }
 
+    if (selectedCategory?.subCategories?.length > 0 && !selectedSubCategoryId) {
+      return { message: "Please select a subcategory for this category" }
+    }
+
     const trimmedDescription = itemDescription.trim()
     if (trimmedDescription.length > 0 && trimmedDescription.length < minDescriptionLength) {
       return { message: "Item description must be at least 5 characters" }
@@ -958,6 +962,7 @@ export default function ItemDetailsPage() {
     return {
       matchedCategory,
       categoryId,
+      subCategoryId: selectedCategory?.subCategories?.length > 0 ? selectedSubCategoryId : "",
       normalizedVariants,
       hasVariants,
       parsedBasePrice,
@@ -977,11 +982,15 @@ export default function ItemDetailsPage() {
     const {
       matchedCategory,
       categoryId,
+      subCategoryId,
       normalizedVariants,
       hasVariants,
       parsedBasePrice,
     } = validation
     const categoryName = matchedCategory?.name || category || ""
+    const subCategoryName = subCategoryId
+      ? selectedCategory?.subCategories?.find((s) => String(s.id) === String(subCategoryId))?.name || ""
+      : ""
     const variantPayload = normalizedVariants.map((variant) => ({
       ...(variant.persistedId ? { _id: variant.persistedId } : {}),
       name: variant.name,
@@ -1083,7 +1092,9 @@ export default function ItemDetailsPage() {
           preparationTime: preparationTime || "",
           itemSlotTimingId: itemSlotTimingId || null,
           categoryId: categoryId || undefined,
+          subCategoryId: subCategoryId || null,
           categoryName,
+          subCategoryName,
         })
         const created = createRes?.data?.data?.food || createRes?.data?.food
         itemId = String(created?._id || created?.id || "")
@@ -1108,7 +1119,9 @@ export default function ItemDetailsPage() {
           preparationTime: preparationTime || "",
           itemSlotTimingId: itemSlotTimingId || null,
           categoryId: categoryId || undefined,
+          subCategoryId: subCategoryId || null,
           categoryName,
+          subCategoryName,
         })
       }
 
@@ -1277,7 +1290,7 @@ export default function ItemDetailsPage() {
             return (
               <button
                 key={cat.id}
-                onClick={() => handleCategorySelect(cat.id, cat.name)}
+                onClick={() => handleCategorySelect(cat.id)}
                 className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${isSelected
                   ? "border-gray-900 bg-gray-900 text-white"
                   : "border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50"
@@ -1657,6 +1670,27 @@ export default function ItemDetailsPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Subcategory (only when the selected category has any) */}
+                  {selectedCategory?.subCategories?.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">
+                        Subcategory
+                      </label>
+                      <select
+                        value={selectedSubCategoryId}
+                        onChange={(e) => setSelectedSubCategoryId(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Select subcategory</option>
+                        {selectedCategory.subCategories.map((sub) => (
+                          <option key={sub.id} value={sub.id}>
+                            {sub.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   {/* Item Name */}
                   <div>

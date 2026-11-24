@@ -204,6 +204,55 @@ export const resolveCategoryForRestaurant = (context, body = {}, cache = null) =
     return cache.get(key);
 };
 
+const resolveSubCategoryUncached = async (categoryObjectId, { subCategoryId, subCategoryName } = {}) => {
+    const { FoodSubCategory } = await import('../../admin/models/subcategory.model.js');
+    const categoryHasSubCategories = categoryObjectId
+        ? (await FoodSubCategory.countDocuments({ categoryId: categoryObjectId, isActive: { $ne: false } })) > 0
+        : false;
+
+    const subCategoryIdRaw = toStr(subCategoryId);
+    const subCategoryNameRaw = toStr(subCategoryName);
+
+    if (!subCategoryIdRaw && subCategoryNameRaw) {
+        const exact = `^${subCategoryNameRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`;
+        const match = await FoodSubCategory.findOne({
+            categoryId: categoryObjectId,
+            name: { $regex: exact, $options: 'i' },
+            isActive: { $ne: false }
+        }).select('_id name').lean();
+        if (match) {
+            return { subCategoryObjectId: match._id, subCategoryName: match.name };
+        }
+    }
+
+    if (!subCategoryIdRaw) {
+        if (categoryHasSubCategories) {
+            throw new ValidationError('This category has subcategories — please select one');
+        }
+        return { subCategoryObjectId: undefined, subCategoryName: '' };
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(subCategoryIdRaw)) {
+        throw new ValidationError('Invalid subcategory id');
+    }
+    const doc = await FoodSubCategory.findById(subCategoryIdRaw).select('name categoryId isActive').lean();
+    if (!doc || doc.isActive === false) {
+        throw new ValidationError('Subcategory not found');
+    }
+    if (String(doc.categoryId) !== String(categoryObjectId)) {
+        throw new ValidationError('Subcategory does not belong to the selected category');
+    }
+    return { subCategoryObjectId: doc._id, subCategoryName: doc.name };
+};
+
+/** Same cache-or-not pattern as resolveCategoryForRestaurant. */
+export const resolveSubCategoryForRestaurant = (categoryObjectId, input = {}, cache = null) => {
+    if (!cache) return resolveSubCategoryUncached(categoryObjectId, input);
+    const key = [String(categoryObjectId || ''), toStr(input.subCategoryId), toStr(input.subCategoryName).toLowerCase()].join('|');
+    if (!cache.has(key)) cache.set(key, resolveSubCategoryUncached(categoryObjectId, input));
+    return cache.get(key);
+};
+
 /**
  * Distinct existing item names for a category (across all restaurants), so a restaurant
  * owner can pick a name from what's already used instead of typing full item data by
@@ -285,10 +334,18 @@ export async function prepareRestaurantFoodDoc(restaurantId, body = {}, options 
         options.categoryCache || null
     );
 
+    const { subCategoryObjectId, subCategoryName } = await resolveSubCategoryForRestaurant(
+        categoryObjectId,
+        { subCategoryId: body.subCategoryId, subCategoryName: body.subCategoryName },
+        options.subCategoryCache || null
+    );
+
     const doc = {
         restaurantId,
         categoryId: categoryObjectId,
         categoryName: categoryName || '',
+        subCategoryId: subCategoryObjectId,
+        subCategoryName: subCategoryName || '',
         name,
         description,
         price,
@@ -454,6 +511,22 @@ export async function updateRestaurantFood(restaurantId, foodId, body = {}) {
         });
         update.categoryId = categoryObjectId;
         update.categoryName = categoryName || '';
+    }
+
+    if (
+        body.subCategoryId !== undefined ||
+        body.subCategoryName !== undefined ||
+        update.categoryId !== undefined
+    ) {
+        const { subCategoryObjectId, subCategoryName } = await resolveSubCategoryForRestaurant(
+            update.categoryId !== undefined ? update.categoryId : existing.categoryId,
+            {
+                subCategoryId: body.subCategoryId !== undefined ? body.subCategoryId : existing.subCategoryId,
+                subCategoryName: body.subCategoryName !== undefined ? body.subCategoryName : existing.subCategoryName
+            }
+        );
+        update.subCategoryId = subCategoryObjectId || null;
+        update.subCategoryName = subCategoryName || '';
     }
 
     const shouldResubmitForApproval = Object.keys(update).length > 0;

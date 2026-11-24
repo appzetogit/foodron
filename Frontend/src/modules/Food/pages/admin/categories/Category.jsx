@@ -32,6 +32,7 @@ const defaultFormData = {
   zoneId: "global",
   foodTypeScope: "Veg",
   sortOrder: 1,
+  subCategoryNames: [""],
 }
 
 const approvalBadgeClass = (status) => {
@@ -269,6 +270,9 @@ export default function Category() {
         ? category.zoneId
         : category?.zoneId?._id || category?.zoneId?.id || "global"
 
+    const existingSubNames = Array.isArray(category?.subCategories)
+      ? category.subCategories.map((s) => s?.name || "")
+      : []
     setFormData({
       name: category?.name || "",
       image: category?.image || "",
@@ -277,10 +281,30 @@ export default function Category() {
       zoneId: zoneIdValue || "global",
       foodTypeScope: category?.foodTypeScope || "Veg",
       sortOrder: Math.max(1, Number.isFinite(Number(category?.sortOrder)) ? Number(category.sortOrder) : 1),
+      subCategoryNames: existingSubNames.length ? existingSubNames : [""],
     })
     setSelectedImageFile(null)
     setImagePreview(category?.image || null)
     setIsModalOpen(true)
+  }
+
+  const handleSubCategoryNameChange = (index, value) => {
+    setFormData((prev) => {
+      const next = [...prev.subCategoryNames]
+      next[index] = value
+      return { ...prev, subCategoryNames: next }
+    })
+  }
+
+  const handleAddSubCategoryRow = () => {
+    setFormData((prev) => ({ ...prev, subCategoryNames: [...prev.subCategoryNames, ""] }))
+  }
+
+  const handleRemoveSubCategoryRow = (index) => {
+    setFormData((prev) => {
+      const next = prev.subCategoryNames.filter((_, i) => i !== index)
+      return { ...prev, subCategoryNames: next.length ? next : [""] }
+    })
   }
 
   const handleImageSelect = (event) => {
@@ -480,6 +504,7 @@ export default function Category() {
         zoneId: formData.zoneId || "global",
         foodTypeScope: formData.foodTypeScope,
         sortOrder: Math.max(1, Number.isFinite(Number(formData.sortOrder)) ? Number(formData.sortOrder) : 1),
+        subCategoryNames: formData.subCategoryNames.map((n) => String(n || "").trim()).filter(Boolean),
       }
 
       if (editingCategory) {
@@ -623,6 +648,18 @@ export default function Category() {
                               <span className="text-slate-300">•</span>
                               <span>Items linked: {category?.itemCount || 0}</span>
                             </div>
+                            {Array.isArray(category?.subCategories) && category.subCategories.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {category.subCategories.map((sub) => (
+                                  <span
+                                    key={sub.id}
+                                    className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600"
+                                  >
+                                    {sub.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -884,6 +921,45 @@ export default function Category() {
                               <p className="text-xs text-rose-600">An image is required before saving the category.</p>
                             )}
                           </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-slate-700">
+                            Subcategories <span className="font-normal text-slate-400">(optional)</span>
+                          </label>
+                          <div className="space-y-2">
+                            {formData.subCategoryNames.map((value, index) => (
+                              <div key={index} className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={value}
+                                  onChange={(event) => handleSubCategoryNameChange(index, event.target.value)}
+                                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 outline-none focus:border-slate-900"
+                                  placeholder="e.g. Pizza, Burgers, Combos"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveSubCategoryRow(index)}
+                                  className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-rose-600"
+                                  title="Remove"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleAddSubCategoryRow}
+                            className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add another subcategory
+                          </button>
+                          <p className="mt-2 text-xs text-slate-500">
+                            Leave empty if this category doesn&apos;t need subcategories. A restaurant adding food under this
+                            category will then need to pick one of these.
+                          </p>
                         </div>
 
                         <label className="flex items-center gap-3 text-sm font-medium text-slate-700">

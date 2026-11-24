@@ -29,6 +29,7 @@ const defaultFormData = {
   isActive: true,
   sortOrder: 0,
   foodTypeScope: "Veg",
+  subCategoryNames: [""],
 }
 
 const INACTIVE_CATEGORY_WARNING = "This category is currently inactive and is not available for use."
@@ -152,6 +153,9 @@ export default function MenuCategoriesPage() {
       return
     }
     setEditingCategory(category)
+    const existingSubNames = Array.isArray(category?.subCategories)
+      ? category.subCategories.map((s) => s?.name || "")
+      : []
     setFormData({
       name: category?.name || "",
       type: category?.type || "",
@@ -159,10 +163,30 @@ export default function MenuCategoriesPage() {
       isActive: category?.isActive !== false,
       sortOrder: Number.isFinite(Number(category?.sortOrder)) ? Number(category.sortOrder) : 0,
       foodTypeScope: category?.foodTypeScope || "Veg",
+      subCategoryNames: existingSubNames.length ? existingSubNames : [""],
     })
     setSelectedImageFile(null)
     setImagePreview(category?.image || null)
     setShowModal(true)
+  }
+
+  const handleSubCategoryNameChange = (index, value) => {
+    setFormData((prev) => {
+      const next = [...prev.subCategoryNames]
+      next[index] = value
+      return { ...prev, subCategoryNames: next }
+    })
+  }
+
+  const handleAddSubCategoryRow = () => {
+    setFormData((prev) => ({ ...prev, subCategoryNames: [...prev.subCategoryNames, ""] }))
+  }
+
+  const handleRemoveSubCategoryRow = (index) => {
+    setFormData((prev) => {
+      const next = prev.subCategoryNames.filter((_, i) => i !== index)
+      return { ...prev, subCategoryNames: next.length ? next : [""] }
+    })
   }
 
   const handleImageFileChange = (file) => {
@@ -227,6 +251,7 @@ export default function MenuCategoriesPage() {
         isActive: formData.isActive !== false,
         sortOrder: Number.isFinite(Number(formData.sortOrder)) ? Number(formData.sortOrder) : 0,
         foodTypeScope: formData.foodTypeScope,
+        subCategoryNames: formData.subCategoryNames.map((n) => String(n || "").trim()).filter(Boolean),
       }
 
       if (editingCategory) {
@@ -370,6 +395,41 @@ export default function MenuCategoriesPage() {
           accept="image/*"
           onChange={(e) => handleImageFileChange(e.target.files?.[0])}
         />
+      </div>
+
+      <div>
+        <label className="mb-2 block text-sm font-medium text-slate-700">
+          Subcategories <span className="font-normal text-slate-400">(optional)</span>
+        </label>
+        <div className="space-y-2">
+          {formData.subCategoryNames.map((value, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={value}
+                onChange={(e) => handleSubCategoryNameChange(index, e.target.value)}
+                className="w-full rounded-xl border border-slate-300 px-4 py-2.5 outline-none focus:border-slate-900"
+                placeholder="e.g. Pizza, Burgers, Combos"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveSubCategoryRow(index)}
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-rose-600"
+                title="Remove"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={handleAddSubCategoryRow}
+          className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700"
+        >
+          <Plus className="h-4 w-4" />
+          Add another subcategory
+        </button>
       </div>
 
       <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -524,6 +584,18 @@ export default function MenuCategoriesPage() {
                           <p className="text-rose-600">Reason: {category.rejectionReason}</p>
                         )}
                       </div>
+                      {Array.isArray(category?.subCategories) && category.subCategories.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {category.subCategories.map((sub) => (
+                            <span
+                              key={sub.id}
+                              className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600"
+                            >
+                              {sub.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     </div>
 

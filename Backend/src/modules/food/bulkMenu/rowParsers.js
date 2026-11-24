@@ -117,6 +117,9 @@ export function parseFoodRow(values = {}) {
         errors.push({ code: ERROR.CATEGORY_REQUIRED, message: 'categoryName or categoryId is required.' });
     }
 
+    setIfPresent(body, 'subCategoryName', values.subCategoryName, toText);
+    setIfPresent(body, 'subCategoryId', values.subCategoryId, toText);
+
     if (isEmpty(values.foodType)) {
         errors.push({ code: ERROR.INVALID_FOOD_TYPE, message: 'foodType is required (Veg or Non-Veg).' });
     } else {

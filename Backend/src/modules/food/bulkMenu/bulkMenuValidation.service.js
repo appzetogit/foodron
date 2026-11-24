@@ -49,6 +49,8 @@ export async function cleanupStaleStaging() {
 }
 
 const mapServiceError = (message = '') => {
+    if (/has subcategories/i.test(message)) return ERROR.SUBCATEGORY_REQUIRED;
+    if (/subcategory not found|invalid subcategory id|does not belong to the selected category/i.test(message)) return ERROR.SUBCATEGORY_NOT_FOUND;
     if (/category not found|invalid category id/i.test(message)) return ERROR.CATEGORY_NOT_FOUND;
     if (/multiple categories/i.test(message)) return ERROR.CATEGORY_AMBIGUOUS;
     if (/currently inactive/i.test(message)) return ERROR.CATEGORY_INACTIVE;
@@ -185,7 +187,7 @@ export async function validateBulkPackage({ zipPath, fileName, entity, scope }) 
         };
 
         // ---- foods
-        const caches = { categoryCache: new Map(), slotCache: new Map() };
+        const caches = { categoryCache: new Map(), subCategoryCache: new Map(), slotCache: new Map() };
         let existingKeys = null;
         const fileKeys = new Set();
 
