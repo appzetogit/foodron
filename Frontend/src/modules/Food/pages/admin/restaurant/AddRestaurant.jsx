@@ -32,6 +32,23 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => { console.warn(...args) }
 const debugError = (...args) => { console.error(...args) }
 
+// Plain-JS point-in-polygon (ray casting) — no Maps API call needed, reuses already-fetched coordinates.
+const isPointInPolygon = (lat, lng, polygon) => {
+  if (!Array.isArray(polygon) || polygon.length < 3) return false
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = Number(polygon[i].longitude ?? polygon[i].lng)
+    const yi = Number(polygon[i].latitude ?? polygon[i].lat)
+    const xj = Number(polygon[j].longitude ?? polygon[j].lng)
+    const yj = Number(polygon[j].latitude ?? polygon[j].lat)
+    const intersect =
+      yi > lat !== yj > lat &&
+      lng < ((xj - xi) * (lat - yi)) / (yj - yi + 0.0) + xi
+    if (intersect) inside = !inside
+  }
+  return inside
+}
+
 
 const cuisinesOptions = [
   "North Indian",
@@ -449,9 +466,26 @@ export default function AddRestaurant() {
     if (!step1.primaryContactNumber?.trim()) errors.push("Primary contact number is required")
     if (step1.primaryContactNumber?.trim() && !PHONE_REGEX.test(step1.primaryContactNumber.trim())) errors.push("Primary contact number must be 10 digits")
     if (!step1.zoneId?.trim()) errors.push("Service zone is required")
-    if (!step1.serviceAreaId?.trim()) errors.push("Service area is required")
+    if (step1.zoneId?.trim() && serviceAreas.length > 0 && !step1.serviceAreaId?.trim()) {
+      errors.push("Service area is required")
+    }
     if (!step1.location?.area?.trim()) errors.push("Area/Sector/Locality is required")
     if (!step1.location?.city?.trim()) errors.push("City is required")
+
+    const lat = Number(step1.location?.latitude)
+    const lng = Number(step1.location?.longitude)
+    if (step1.zoneId && Number.isFinite(lat) && Number.isFinite(lng)) {
+      const selectedZone = zones.find((z) => String(z._id || z.id) === step1.zoneId)
+      if (selectedZone?.coordinates?.length >= 3 && !isPointInPolygon(lat, lng, selectedZone.coordinates)) {
+        errors.push("Selected address is outside the selected zone")
+      }
+      if (step1.serviceAreaId) {
+        const selectedServiceArea = serviceAreas.find((s) => String(s._id || s.id) === step1.serviceAreaId)
+        if (selectedServiceArea?.coordinates?.length >= 3 && !isPointInPolygon(lat, lng, selectedServiceArea.coordinates)) {
+          errors.push("Selected address is outside the selected service area")
+        }
+      }
+    }
     return errors
   }
 
@@ -1106,34 +1140,32 @@ export default function AddRestaurant() {
             Choose the service zone where your restaurant will be available.
           </p>
         </div>
-        <div>
-          <Label className="text-xs text-gray-700">Service area*</Label>
-          <select
-            value={step1.serviceAreaId || ""}
-            onChange={(e) => setStep1({ ...step1, serviceAreaId: e.target.value })}
-            className="mt-1 w-full h-9 rounded-md border border-input bg-white px-3 text-sm"
-            disabled={serviceAreasLoading || !step1.zoneId}
-          >
-            <option value="">
-              {!step1.zoneId
-                ? "Select a zone first"
-                : serviceAreasLoading
-                  ? "Loading service areas..."
-                  : "Select a service area"}
-            </option>
-            {serviceAreas.map((s) => {
-              const id = String(s?._id || s?.id || "")
-              return (
-                <option key={id} value={id}>
-                  {s?.name || id}
-                </option>
-              )
-            })}
-          </select>
-          <p className="text-[11px] text-gray-500 mt-1">
-            Used only to filter/report data by sub-area inside the zone — the restaurant's pin must fall inside it.
-          </p>
-        </div>
+        {step1.zoneId && (serviceAreasLoading || serviceAreas.length > 0) && (
+          <div>
+            <Label className="text-xs text-gray-700">Service area*</Label>
+            <select
+              value={step1.serviceAreaId || ""}
+              onChange={(e) => setStep1({ ...step1, serviceAreaId: e.target.value })}
+              className="mt-1 w-full h-9 rounded-md border border-input bg-white px-3 text-sm"
+              disabled={serviceAreasLoading}
+            >
+              <option value="">
+                {serviceAreasLoading ? "Loading service areas..." : "Select a service area"}
+              </option>
+              {serviceAreas.map((s) => {
+                const id = String(s?._id || s?.id || "")
+                return (
+                  <option key={id} value={id}>
+                    {s?.name || id}
+                  </option>
+                )
+              })}
+            </select>
+            <p className="text-[11px] text-gray-500 mt-1">
+              Used only to filter/report data by sub-area inside the zone — the restaurant's pin must fall inside it.
+            </p>
+          </div>
+        )}
         <div>
           <Label className="text-xs text-gray-700">Primary contact number*</Label>
           <Input

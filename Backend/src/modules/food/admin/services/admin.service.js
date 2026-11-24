@@ -606,6 +606,10 @@ export async function getDashboardStats(query = {}) {
     const zoneId = query.zoneId && mongoose.Types.ObjectId.isValid(query.zoneId)
         ? new mongoose.Types.ObjectId(query.zoneId)
         : null;
+    // Optional narrower tag inside the zone — data-filtering only, never changes the zone-based flow.
+    const serviceAreaId = query.serviceAreaId && mongoose.Types.ObjectId.isValid(query.serviceAreaId)
+        ? new mongoose.Types.ObjectId(query.serviceAreaId)
+        : null;
 
     const orderMatch = {
         orderType: 'food',
@@ -624,10 +628,11 @@ export async function getDashboardStats(query = {}) {
     const restaurantMatch = {};
     if (zoneId) {
         restaurantMatch.zoneId = zoneId;
+        if (serviceAreaId) restaurantMatch.serviceAreaId = serviceAreaId;
     }
 
     const zoneRestaurantIds = zoneId
-        ? await FoodRestaurant.find({ zoneId }).distinct('_id')
+        ? await FoodRestaurant.find({ zoneId, ...(serviceAreaId ? { serviceAreaId } : {}) }).distinct('_id')
         : null;
     const zoneDoc = zoneId
         ? await FoodZone.findById(zoneId).select('zoneName name serviceLocation coordinates').lean()
@@ -1447,7 +1452,7 @@ const buildTransactionReportSummaryPipeline = () => ([
 ]);
 
 export async function getTransactionReport(query = {}) {
-    const { fromDate, toDate, zone, restaurant, search } = query;
+    const { fromDate, toDate, zone, restaurant, serviceAreaId, search } = query;
     const limit = Math.min(Math.max(parseInt(query.limit, 10) || 50, 1), 500);
     const page = Math.max(parseInt(query.page, 10) || 1, 1);
     const skip = (page - 1) * limit;
@@ -1469,7 +1474,7 @@ export async function getTransactionReport(query = {}) {
         ];
     }
 
-    if (zone || restaurant) {
+    if (zone || restaurant || serviceAreaId) {
         const restFilter = {};
         if (zone) {
             const zoneRaw = String(zone).trim();
@@ -1483,6 +1488,9 @@ export async function getTransactionReport(query = {}) {
                     .lean();
                 restFilter.zoneId = matchedZone?._id || null;
             }
+        }
+        if (serviceAreaId && mongoose.Types.ObjectId.isValid(String(serviceAreaId).trim())) {
+            restFilter.serviceAreaId = new mongoose.Types.ObjectId(String(serviceAreaId).trim());
         }
         if (restaurant && restaurant !== 'All restaurants') {
             const restDoc = await mongoose.model('FoodRestaurant').findOne({ restaurantName: restaurant }).lean();
@@ -1678,6 +1686,11 @@ export async function getRestaurantReport(query = {}) {
                 return { restaurants: [], total: 0, page, limit };
             }
         }
+    }
+
+    const serviceAreaIdRaw = String(query.serviceAreaId || '').trim();
+    if (serviceAreaIdRaw && mongoose.Types.ObjectId.isValid(serviceAreaIdRaw)) {
+        restaurantFilter.serviceAreaId = new mongoose.Types.ObjectId(serviceAreaIdRaw);
     }
 
     const searchRaw = String(query.search || '').trim();
@@ -1911,7 +1924,7 @@ export async function getRestaurantReport(query = {}) {
 }
 
 export async function getTaxReport(query = {}) {
-    const { fromDate, toDate, search, calculateTax, taxRate, zoneId } = query;
+    const { fromDate, toDate, search, calculateTax, taxRate, zoneId, serviceAreaId } = query;
     const match = {
         orderType: 'food',
         orderStatus: 'delivered' // Typically tax is reported on delivered/completed orders
@@ -1928,6 +1941,11 @@ export async function getTaxReport(query = {}) {
 
     if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
         match.zoneId = new mongoose.Types.ObjectId(zoneId);
+        // Orders don't carry serviceAreaId directly, so narrow via the zone's restaurants.
+        if (serviceAreaId && mongoose.Types.ObjectId.isValid(serviceAreaId)) {
+            const zoneRestaurantIds = await FoodRestaurant.find({ zoneId, serviceAreaId }).select('_id').lean();
+            match.restaurantId = { $in: zoneRestaurantIds.map((r) => r._id) };
+        }
     }
 
     // Taxable income = food subtotal (GST is calculated on subtotal in order-pricing).
@@ -2642,8 +2660,13 @@ export async function getSupportTickets(query = {}) {
     if (restaurantSearchOr.length) restaurantFilter.$or = restaurantSearchOr;
 
     const zoneId = String(query.zoneId || '').trim();
+    const serviceAreaId = String(query.serviceAreaId || '').trim();
     if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
-        const zoneRestaurantIds = await FoodRestaurant.find({ zoneId }).select('_id').lean();
+        const restaurantZoneFilter = { zoneId };
+        if (serviceAreaId && mongoose.Types.ObjectId.isValid(serviceAreaId)) {
+            restaurantZoneFilter.serviceAreaId = serviceAreaId;
+        }
+        const zoneRestaurantIds = await FoodRestaurant.find(restaurantZoneFilter).select('_id').lean();
         const ids = zoneRestaurantIds.map((r) => r._id);
         // Tickets not tied to a restaurant can't be attributed to a zone; scoping to
         // restaurantId keeps this filter cheap without needing a zoneId snapshot per ticket.
@@ -5671,20 +5694,24 @@ export async function createRestaurantByAdmin(body, performer = null) {
     doc.zoneId = new mongoose.Types.ObjectId(zoneIdRaw);
 
     const serviceAreaIdRaw = String(body.serviceAreaId || '').trim();
-    if (!serviceAreaIdRaw) {
+    // Service area is required whenever the zone has at least one defined.
+    const zoneHasServiceAreas = await FoodServiceArea.exists({ zoneId: zoneIdRaw });
+    if (zoneHasServiceAreas && !serviceAreaIdRaw) {
         throw new ValidationError('Service area is required');
     }
-    if (!mongoose.Types.ObjectId.isValid(serviceAreaIdRaw)) {
-        throw new ValidationError('Invalid serviceAreaId');
+    if (serviceAreaIdRaw) {
+        if (!mongoose.Types.ObjectId.isValid(serviceAreaIdRaw)) {
+            throw new ValidationError('Invalid serviceAreaId');
+        }
+        const serviceArea = await FoodServiceArea.findOne({ _id: serviceAreaIdRaw, zoneId: zoneIdRaw }).select('coordinates').lean();
+        if (!serviceArea) {
+            throw new ValidationError('Selected service area does not belong to the selected zone');
+        }
+        if (!isPointInPolygon(latitude, longitude, serviceArea.coordinates)) {
+            throw new ValidationError('Selected address is outside the selected service area');
+        }
+        doc.serviceAreaId = new mongoose.Types.ObjectId(serviceAreaIdRaw);
     }
-    const serviceArea = await FoodServiceArea.findOne({ _id: serviceAreaIdRaw, zoneId: zoneIdRaw }).select('coordinates').lean();
-    if (!serviceArea) {
-        throw new ValidationError('Selected service area does not belong to the selected zone');
-    }
-    if (!isPointInPolygon(latitude, longitude, serviceArea.coordinates)) {
-        throw new ValidationError('Selected address is outside the selected service area');
-    }
-    doc.serviceAreaId = new mongoose.Types.ObjectId(serviceAreaIdRaw);
 
     if (latitude !== null && longitude !== null) {
         doc.location = {
@@ -6459,7 +6486,7 @@ export async function expireExpiredOffers() {
 }
 // ----- Delivery join requests -----
 export async function getDeliveryJoinRequests(query) {
-    const { status = 'pending', page = 1, limit = 1000, search, zone, vehicleType } = query;
+    const { status = 'pending', page = 1, limit = 1000, search, zone, vehicleType, serviceAreaId } = query;
     const filter = {};
     const requestedStatus = String(status || 'pending').trim().toLowerCase();
 
@@ -6561,6 +6588,10 @@ export async function getDeliveryJoinRequests(query) {
     if (zone && zone.trim()) {
         const zTerm = zone.trim().toLowerCase();
         requests = requests.filter((r) => r.detectedZoneName.toLowerCase().includes(zTerm));
+    }
+    if (serviceAreaId && String(serviceAreaId).trim()) {
+        const saTerm = String(serviceAreaId).trim();
+        requests = requests.filter((r) => String(r.serviceAreaId || '') === saTerm);
     }
 
     const totalCount = requests.length;

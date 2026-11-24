@@ -26,12 +26,14 @@ export default function JoinRequest() {
   const [rejectionReason, setRejectionReason] = useState("")
   const [filters, setFilters] = useState({
     zone: "",
+    serviceAreaId: "",
     jobType: "",
     vehicleType: "",
   })
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [debouncedSearch, setDebouncedSearch] = useState("")
   const [allZones, setAllZones] = useState([])
+  const [serviceAreas, setServiceAreas] = useState([])
 
   // Fetch all zones for the filter dropdown
   useEffect(() => {
@@ -47,6 +49,26 @@ export default function JoinRequest() {
     }
     fetchZones()
   }, [])
+
+  // Fetch service areas for the selected zone (optional narrower filter)
+  useEffect(() => {
+    if (!filters.zone) {
+      setServiceAreas([])
+      return
+    }
+    const matchedZone = allZones.find((z) => z.name === filters.zone)
+    if (!matchedZone?._id) {
+      setServiceAreas([])
+      return
+    }
+    adminAPI
+      .getServiceAreas({ zoneId: matchedZone._id })
+      .then((res) => {
+        const list = res?.data?.data?.serviceAreas || []
+        setServiceAreas(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setServiceAreas([]))
+  }, [filters.zone, allZones])
 
   // Debounce search so we don't fetch on every keystroke
   useEffect(() => {
@@ -78,6 +100,9 @@ export default function JoinRequest() {
       }
       if (filters.zone) {
         params.zone = filters.zone
+      }
+      if (filters.zone && filters.serviceAreaId) {
+        params.serviceAreaId = filters.serviceAreaId
       }
       if (filters.vehicleType) {
         params.vehicleType = filters.vehicleType.toLowerCase()
@@ -242,13 +267,13 @@ export default function JoinRequest() {
   }
 
   const handleResetFilters = () => {
-    setFilters({ zone: "", jobType: "", vehicleType: "" })
+    setFilters({ zone: "", serviceAreaId: "", jobType: "", vehicleType: "" })
   }
 
   const handleTabChange = (tab) => {
     setActiveTab(tab)
     setSearchQuery("") // Reset search when changing tabs
-    setFilters({ zone: "", jobType: "", vehicleType: "" }) // Reset filters
+    setFilters({ zone: "", serviceAreaId: "", jobType: "", vehicleType: "" }) // Reset filters
   }
 
   const activeFiltersCount = Object.values(filters).filter(v => v).length
@@ -1120,7 +1145,7 @@ export default function JoinRequest() {
               <label className="block text-sm font-semibold text-slate-700 mb-2">Zone</label>
               <select
                 value={filters.zone}
-                onChange={(e) => setFilters({ ...filters, zone: e.target.value })}
+                onChange={(e) => setFilters({ ...filters, zone: e.target.value, serviceAreaId: "" })}
                 className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               >
                 <option value="">All Zones</option>
@@ -1129,6 +1154,21 @@ export default function JoinRequest() {
                 ))}
               </select>
             </div>
+            {filters.zone && serviceAreas.length > 0 && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Service Area</label>
+                <select
+                  value={filters.serviceAreaId}
+                  onChange={(e) => setFilters({ ...filters, serviceAreaId: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  <option value="">All Service Areas</option>
+                  {serviceAreas.map(sa => (
+                    <option key={sa._id} value={sa._id}>{sa.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Vehicle Type</label>
               <select

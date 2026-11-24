@@ -24,9 +24,11 @@ export default function FeedbackExperienceReport() {
     experience: "",
     module: "",
     zoneId: "",
+    serviceAreaId: "",
   })
   const [isFilterOpen, setIsFilterOpen] = useState(true)
   const [zones, setZones] = useState([])
+  const [serviceAreas, setServiceAreas] = useState([])
 
   useEffect(() => {
     adminAPI
@@ -37,6 +39,21 @@ export default function FeedbackExperienceReport() {
       })
       .catch(() => setZones([]))
   }, [])
+
+  // Fetch service areas for the selected zone (optional narrower filter)
+  useEffect(() => {
+    if (!filters.zoneId) {
+      setServiceAreas([])
+      return
+    }
+    adminAPI
+      .getServiceAreas({ zoneId: filters.zoneId })
+      .then((res) => {
+        const list = res?.data?.data?.serviceAreas || []
+        setServiceAreas(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setServiceAreas([]))
+  }, [filters.zoneId])
 
   // Fetch feedback experiences
   useEffect(() => {
@@ -55,6 +72,7 @@ export default function FeedbackExperienceReport() {
         ...(filters.experience && { experience: filters.experience }),
         ...(filters.module && { module: filters.module }),
         ...(filters.zoneId && { zoneId: filters.zoneId }),
+        ...(filters.zoneId && filters.serviceAreaId && { serviceAreaId: filters.serviceAreaId }),
       }
       const response = await adminAPI.getFeedbackExperiences(params)
       if (response.data && response.data.data) {
@@ -107,6 +125,7 @@ export default function FeedbackExperienceReport() {
       experience: "",
       module: "",
       zoneId: "",
+      serviceAreaId: "",
     })
     setSearchQuery("")
   }
@@ -193,7 +212,7 @@ export default function FeedbackExperienceReport() {
   }
 
   const activeFiltersCount = (filters.fromDate ? 1 : 0) + (filters.toDate ? 1 : 0) +
-    (filters.rating ? 1 : 0) + (filters.experience ? 1 : 0) + (filters.module ? 1 : 0) + (filters.zoneId ? 1 : 0)
+    (filters.rating ? 1 : 0) + (filters.experience ? 1 : 0) + (filters.module ? 1 : 0) + (filters.zoneId ? 1 : 0) + (filters.serviceAreaId ? 1 : 0)
 
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen overflow-x-hidden">
@@ -261,7 +280,7 @@ export default function FeedbackExperienceReport() {
                   </label>
                   <select
                     value={filters.zoneId}
-                    onChange={(e) => setFilters(prev => ({ ...prev, zoneId: e.target.value }))}
+                    onChange={(e) => setFilters(prev => ({ ...prev, zoneId: e.target.value, serviceAreaId: "" }))}
                     className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">All Zones</option>
@@ -271,6 +290,25 @@ export default function FeedbackExperienceReport() {
                   </select>
                   <ChevronDown className="absolute right-2 bottom-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
                 </div>
+
+                {filters.zoneId && serviceAreas.length > 0 && (
+                  <div className="relative">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Service Area
+                    </label>
+                    <select
+                      value={filters.serviceAreaId}
+                      onChange={(e) => setFilters(prev => ({ ...prev, serviceAreaId: e.target.value }))}
+                      className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">All Service Areas</option>
+                      {serviceAreas.map((sa) => (
+                        <option key={sa._id} value={sa._id}>{sa.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2 bottom-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
+                  </div>
+                )}
 
                 <div className="relative">
                   <label className="block text-sm font-semibold text-slate-700 mb-2">

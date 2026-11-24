@@ -46,11 +46,13 @@ export default function TransactionReport() {
   })
   const [filters, setFilters] = useState({
     zone: "All Zones",
+    serviceAreaId: "",
     restaurant: "All restaurants",
     time: "All Time",
   })
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [zones, setZones] = useState([])
+  const [serviceAreas, setServiceAreas] = useState([])
   const [restaurants, setRestaurants] = useState([])
 
   // Fetch zones and restaurants for filters
@@ -74,6 +76,26 @@ export default function TransactionReport() {
     }
     fetchFilterData()
   }, [])
+
+  // Fetch service areas for the selected zone (optional narrower filter)
+  useEffect(() => {
+    if (filters.zone === "All Zones") {
+      setServiceAreas([])
+      return
+    }
+    const matchedZone = zones.find((z) => (z.zoneName || z.name) === filters.zone)
+    if (!matchedZone?._id) {
+      setServiceAreas([])
+      return
+    }
+    adminAPI
+      .getServiceAreas({ zoneId: matchedZone._id })
+      .then((res) => {
+        const list = res?.data?.data?.serviceAreas || []
+        setServiceAreas(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setServiceAreas([]))
+  }, [filters.zone, zones])
 
   // Reset to first page when filters or search change
   useEffect(() => {
@@ -107,6 +129,7 @@ export default function TransactionReport() {
         const params = {
           search: searchQuery || undefined,
           zone: filters.zone !== "All Zones" ? filters.zone : undefined,
+          serviceAreaId: filters.zone !== "All Zones" && filters.serviceAreaId ? filters.serviceAreaId : undefined,
           restaurant: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
           fromDate: fromDate ? fromDate.toISOString() : undefined,
           toDate: toDate ? toDate.toISOString() : undefined,
@@ -177,6 +200,7 @@ export default function TransactionReport() {
     return {
       search: searchQuery || undefined,
       zone: filters.zone !== "All Zones" ? filters.zone : undefined,
+      serviceAreaId: filters.zone !== "All Zones" && filters.serviceAreaId ? filters.serviceAreaId : undefined,
       restaurant: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
       fromDate: fromDate ? fromDate.toISOString() : undefined,
       toDate: toDate ? toDate.toISOString() : undefined,
@@ -234,12 +258,13 @@ export default function TransactionReport() {
   const handleResetFilters = () => {
     setFilters({
       zone: "All Zones",
+      serviceAreaId: "",
       restaurant: "All restaurants",
       time: "All Time",
     })
   }
 
-  const activeFiltersCount = (filters.zone !== "All Zones" ? 1 : 0) + (filters.restaurant !== "All restaurants" ? 1 : 0) + (filters.time !== "All Time" ? 1 : 0)
+  const activeFiltersCount = (filters.zone !== "All Zones" ? 1 : 0) + (filters.serviceAreaId ? 1 : 0) + (filters.restaurant !== "All restaurants" ? 1 : 0) + (filters.time !== "All Time" ? 1 : 0)
 
   const formatCurrency = (amount) => {
     if (amount >= 1000) {
@@ -306,7 +331,7 @@ export default function TransactionReport() {
             <div className="relative flex-1 min-w-0">
               <select
                 value={filters.zone}
-                onChange={(e) => setFilters(prev => ({ ...prev, zone: e.target.value }))}
+                onChange={(e) => setFilters(prev => ({ ...prev, zone: e.target.value, serviceAreaId: "" }))}
                 className="w-full px-2.5 py-1.5 pr-5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs appearance-none cursor-pointer"
               >
                 <option value="All Zones">All Zones</option>
@@ -316,6 +341,22 @@ export default function TransactionReport() {
               </select>
               <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 pointer-events-none" />
             </div>
+
+            {filters.zone !== "All Zones" && serviceAreas.length > 0 && (
+              <div className="relative flex-1 min-w-0">
+                <select
+                  value={filters.serviceAreaId}
+                  onChange={(e) => setFilters(prev => ({ ...prev, serviceAreaId: e.target.value }))}
+                  className="w-full px-2.5 py-1.5 pr-5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs appearance-none cursor-pointer"
+                >
+                  <option value="">All Service Areas</option>
+                  {serviceAreas.map(sa => (
+                    <option key={sa._id} value={sa._id}>{sa.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 pointer-events-none" />
+              </div>
+            )}
 
             <div className="relative flex-1 min-w-0">
               <select

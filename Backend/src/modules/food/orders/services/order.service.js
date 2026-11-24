@@ -6080,6 +6080,7 @@ async function buildListOrdersAdminFilter(query = {}) {
   const cancelledBy = typeof query.cancelledBy === "string" ? query.cancelledBy.trim().toLowerCase() : "";
   const restaurantIdRaw = typeof query.restaurantId === "string" ? query.restaurantId.trim() : "";
   const zoneIdRaw = typeof query.zoneId === "string" ? query.zoneId.trim() : "";
+  const serviceAreaIdRaw = typeof query.serviceAreaId === "string" ? query.serviceAreaId.trim() : "";
   const userIdRaw = typeof query.userId === "string" ? query.userId.trim() : "";
   const startDateRaw = typeof query.startDate === "string" ? query.startDate.trim() : "";
   const endDateRaw = typeof query.endDate === "string" ? query.endDate.trim() : "";
@@ -6148,6 +6149,13 @@ async function buildListOrdersAdminFilter(query = {}) {
   }
   if (zoneIdRaw && mongoose.Types.ObjectId.isValid(zoneIdRaw)) {
     filter.zoneId = new mongoose.Types.ObjectId(zoneIdRaw);
+    // Orders don't carry serviceAreaId directly, so narrow via the zone's restaurants.
+    if (serviceAreaIdRaw && mongoose.Types.ObjectId.isValid(serviceAreaIdRaw)) {
+      const zoneRestaurantIds = await FoodRestaurant.find({ zoneId: zoneIdRaw, serviceAreaId: serviceAreaIdRaw })
+        .select("_id")
+        .lean();
+      filter.restaurantId = { $in: zoneRestaurantIds.map((r) => r._id) };
+    }
   }
   if (userIdRaw && mongoose.Types.ObjectId.isValid(userIdRaw)) {
     filter.userId = new mongoose.Types.ObjectId(userIdRaw);

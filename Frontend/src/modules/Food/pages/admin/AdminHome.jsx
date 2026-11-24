@@ -54,11 +54,13 @@ export default function AdminHome() {
   const { user: authUser } = useAuth()
   const user = useMemo(() => authUser || getCurrentUser("admin"), [authUser])
   const [selectedZone, setSelectedZone] = useState("all")
+  const [selectedServiceArea, setSelectedServiceArea] = useState("all")
   const [selectedPeriod, setSelectedPeriod] = useState("overall")
   const [isLoading, setIsLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState(null)
   const [hasError, setHasError] = useState(false)
   const [zones, setZones] = useState([])
+  const [serviceAreas, setServiceAreas] = useState([])
   const [resolvedPermissions, setResolvedPermissions] = useState({})
 
   useEffect(() => {
@@ -119,6 +121,27 @@ export default function AdminHome() {
     fetchZones()
   }, [])
 
+  // Fetch service areas for the selected zone (optional narrower filter)
+  useEffect(() => {
+    if (selectedZone === "all") {
+      setServiceAreas([])
+      setSelectedServiceArea("all")
+      return
+    }
+    setSelectedServiceArea("all")
+    const fetchServiceAreas = async () => {
+      try {
+        const response = await adminAPI.getServiceAreas({ zoneId: selectedZone })
+        const list = response?.data?.data?.serviceAreas || []
+        setServiceAreas(Array.isArray(list) ? list : [])
+      } catch (error) {
+        debugError("Error fetching service areas:", error)
+        setServiceAreas([])
+      }
+    }
+    fetchServiceAreas()
+  }, [selectedZone])
+
   // Fetch dashboard stats from backend when filters change
   const fetchDashboardStats = useCallback(async () => {
     try {
@@ -126,6 +149,7 @@ export default function AdminHome() {
       const params = {
         period: selectedPeriod,
         ...(selectedZone !== "all" ? { zoneId: selectedZone } : {}),
+        ...(selectedZone !== "all" && selectedServiceArea !== "all" ? { serviceAreaId: selectedServiceArea } : {}),
       }
       const response = await adminAPI.getDashboardStats(params)
       if (response.data?.success && response.data?.data) {
@@ -144,7 +168,7 @@ export default function AdminHome() {
     } finally {
       setIsLoading(false)
     }
-  }, [selectedZone, selectedPeriod])
+  }, [selectedZone, selectedServiceArea, selectedPeriod])
 
   useEffect(() => {
     fetchDashboardStats()
@@ -286,6 +310,21 @@ export default function AdminHome() {
                 ))}
               </SelectContent>
             </Select>
+            {serviceAreas.length > 0 && (
+              <Select value={selectedServiceArea} onValueChange={setSelectedServiceArea}>
+                <SelectTrigger className="h-8 min-w-[140px] rounded-lg border-slate-200 bg-white text-xs font-medium text-slate-700 shadow-xs">
+                  <SelectValue placeholder="All service areas" />
+                </SelectTrigger>
+                <SelectContent className="border-slate-200 bg-white text-slate-800">
+                  <SelectItem value="all">All service areas</SelectItem>
+                  {serviceAreas.map((sa) => (
+                    <SelectItem key={sa._id} value={sa._id}>
+                      {sa.name || "Unnamed Area"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
               <SelectTrigger className="h-8 min-w-[120px] rounded-lg border-slate-200 bg-white text-xs font-medium text-slate-700 shadow-xs">
                 <SelectValue placeholder="Overall" />

@@ -273,6 +273,8 @@ const buildFormData = async (details, documents) => {
   if (details.address) formData.append("address", details.address)
   if (details.city) formData.append("city", details.city)
   if (details.state) formData.append("state", details.state)
+  if (details.zoneId) formData.append("zoneId", details.zoneId)
+  if (details.serviceAreaId) formData.append("serviceAreaId", details.serviceAreaId)
   
   if (details.vehicles && Array.isArray(details.vehicles)) {
     // Send array as JSON string for future backend processing

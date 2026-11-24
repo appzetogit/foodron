@@ -132,11 +132,13 @@ export default function RegularOrderReport() {
   const [isFiltering, setIsFiltering] = useState(false)
   const [error, setError] = useState(null)
   const [zones, setZones] = useState([])
+  const [serviceAreas, setServiceAreas] = useState([])
   const [restaurants, setRestaurants] = useState([])
   const [customers, setCustomers] = useState([])
-  
+
   const [filters, setFilters] = useState({
     zone: "All Zones",
+    serviceArea: "All Service Areas",
     restaurant: "All restaurants",
     customer: "All customers",
     time: "All Time",
@@ -181,6 +183,21 @@ export default function RegularOrderReport() {
 
     fetchFilterData()
   }, [])
+
+  // Fetch service areas for the selected zone (optional narrower filter)
+  useEffect(() => {
+    if (filters.zone === "All Zones") {
+      setServiceAreas([])
+      return
+    }
+    adminAPI
+      .getServiceAreas({ zoneId: filters.zone })
+      .then((res) => {
+        const list = res?.data?.data?.serviceAreas || []
+        setServiceAreas(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setServiceAreas([]))
+  }, [filters.zone])
 
   // Calculate date range based on time filter
   const getDateRange = () => {
@@ -234,6 +251,7 @@ export default function RegularOrderReport() {
           includeStatusSummary: true,
           search: searchQuery || undefined,
           zoneId: filters.zone !== "All Zones" ? filters.zone : undefined,
+          serviceAreaId: filters.zone !== "All Zones" && filters.serviceArea !== "All Service Areas" ? filters.serviceArea : undefined,
           restaurantId: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
           userId: filters.customer !== "All customers" ? filters.customer : undefined,
           startDate: fromDate ? fromDate.toISOString().split('T')[0] : undefined,
@@ -278,6 +296,7 @@ export default function RegularOrderReport() {
       includeStatusSummary: page === 1,
       search: searchQuery || undefined,
       zoneId: filters.zone !== "All Zones" ? filters.zone : undefined,
+      serviceAreaId: filters.zone !== "All Zones" && filters.serviceArea !== "All Service Areas" ? filters.serviceArea : undefined,
       restaurantId: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
       userId: filters.customer !== "All customers" ? filters.customer : undefined,
       startDate: fromDate ? fromDate.toISOString().split("T")[0] : undefined,
@@ -380,13 +399,14 @@ export default function RegularOrderReport() {
   const handleResetFilters = () => {
     setFilters({
       zone: "All Zones",
+      serviceArea: "All Service Areas",
       restaurant: "All restaurants",
       customer: "All customers",
       time: "All Time",
     })
   }
 
-  const activeFiltersCount = (filters.zone !== "All Zones" ? 1 : 0) + (filters.restaurant !== "All restaurants" ? 1 : 0) + (filters.customer !== "All customers" ? 1 : 0) + (filters.time !== "All Time" ? 1 : 0)
+  const activeFiltersCount = (filters.zone !== "All Zones" ? 1 : 0) + (filters.serviceArea !== "All Service Areas" ? 1 : 0) + (filters.restaurant !== "All restaurants" ? 1 : 0) + (filters.customer !== "All customers" ? 1 : 0) + (filters.time !== "All Time" ? 1 : 0)
 
   const totalPages = Math.max(1, pagination.totalPages || 1)
 
@@ -471,7 +491,10 @@ export default function RegularOrderReport() {
             <div className="relative flex-1 min-w-0">
               <select
                 value={filters.zone}
-                onChange={(e) => handleFilterChange("zone", e.target.value)}
+                onChange={(e) => {
+                  setFilters((prev) => ({ ...prev, zone: e.target.value, serviceArea: "All Service Areas" }))
+                  setCurrentPage(1)
+                }}
                 className="w-full px-2.5 py-1.5 pr-5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs appearance-none cursor-pointer"
               >
                 <option value="All Zones">All Zones</option>
@@ -483,6 +506,24 @@ export default function RegularOrderReport() {
               </select>
               <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 pointer-events-none" />
             </div>
+
+            {filters.zone !== "All Zones" && serviceAreas.length > 0 && (
+              <div className="relative flex-1 min-w-0">
+                <select
+                  value={filters.serviceArea}
+                  onChange={(e) => handleFilterChange("serviceArea", e.target.value)}
+                  className="w-full px-2.5 py-1.5 pr-5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs appearance-none cursor-pointer"
+                >
+                  <option value="All Service Areas">All Service Areas</option>
+                  {serviceAreas.map((sa) => (
+                    <option key={sa._id} value={sa._id}>
+                      {sa.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 pointer-events-none" />
+              </div>
+            )}
 
             <div className="relative flex-1 min-w-0">
               <select

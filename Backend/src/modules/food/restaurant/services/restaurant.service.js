@@ -1034,6 +1034,11 @@ export const saveOnboardingStep = async (stepNum, payload, files) => {
         if (!isPointInPolygon(latNum, lngNum, zone.coordinates)) {
             throw new ValidationError('Selected address is outside the selected zone');
         }
+        // Service area is required whenever the zone has at least one defined.
+        const zoneHasServiceAreas = await FoodServiceArea.exists({ zoneId: step1Data.zoneId });
+        if (zoneHasServiceAreas && !step1Data.serviceAreaId) {
+            throw new ValidationError('Service area is required');
+        }
         if (step1Data.serviceAreaId) {
             const serviceArea = await FoodServiceArea.findOne({
                 _id: step1Data.serviceAreaId,
@@ -1333,6 +1338,12 @@ export const registerRestaurant = async (payload, files, authUserId) => {
 
         if (!isPointInPolygon(latNum, lngNum, zone.coordinates)) {
             throw new ValidationError('Selected address is outside the selected zone');
+        }
+
+        // Service area is required whenever the zone has at least one defined.
+        const zoneHasServiceAreas = await FoodServiceArea.exists({ zoneId });
+        if (zoneHasServiceAreas && !serviceAreaId) {
+            throw new ValidationError('Service area is required');
         }
 
         let resolvedServiceAreaId;
@@ -2061,6 +2072,11 @@ export const updateRestaurantProfile = async (restaurantId, body = {}) => {
         }
 
         const targetServiceAreaId = update.serviceAreaId !== undefined ? update.serviceAreaId : currentRestaurant.serviceAreaId;
+        // Service area is required whenever the zone has at least one defined.
+        const zoneHasServiceAreas = await FoodServiceArea.exists({ zoneId: targetZoneId });
+        if (zoneHasServiceAreas && !targetServiceAreaId) {
+            throw new ValidationError('Service area is required');
+        }
         if (targetServiceAreaId) {
             const serviceArea = await FoodServiceArea.findOne({ _id: targetServiceAreaId, zoneId: targetZoneId }).lean();
             if (!serviceArea) {

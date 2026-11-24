@@ -978,6 +978,22 @@ export default function RestaurantsList() {
       }
     }
 
+    if (window.google?.maps?.geometry?.poly?.containsLocation && locationForm.serviceAreaId) {
+      const selectedSA = serviceAreas.find((s) => String(s?._id || s?.id || "") === String(locationForm.serviceAreaId))
+      const path = selectedSA ? getZoneCoordinatePath(selectedSA, window.google) : []
+      if (path.length >= 3) {
+        const polygon = new window.google.maps.Polygon({ paths: path })
+        const inside = window.google.maps.geometry.poly.containsLocation(
+          new window.google.maps.LatLng(latitude, longitude),
+          polygon,
+        )
+        if (!inside) {
+          alert("The selected pin is outside the selected service area.")
+          return
+        }
+      }
+    }
+
     try {
       setSavingLocation(true)
       const locationPayload = {

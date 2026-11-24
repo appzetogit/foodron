@@ -21,10 +21,11 @@ export default function SupportTickets() {
   const [fromDate, setFromDate] = useState("")
   const [toDate, setToDate] = useState("")
   const [category, setCategory] = useState("")
-  const [filters, setFilters] = useState({ status: "", type: "", source: "all", zoneId: "" })
+  const [filters, setFilters] = useState({ status: "", type: "", source: "all", zoneId: "", serviceAreaId: "" })
   const [editing, setEditing] = useState({})
   const [expandedDesc, setExpandedDesc] = useState({})
   const [zones, setZones] = useState([])
+  const [serviceAreas, setServiceAreas] = useState([])
 
   useEffect(() => {
     let cancelled = false
@@ -40,6 +41,26 @@ export default function SupportTickets() {
       cancelled = true
     }
   }, [])
+
+  // Fetch service areas for the selected zone (optional narrower filter)
+  useEffect(() => {
+    if (!filters.zoneId) {
+      setServiceAreas([])
+      return
+    }
+    let cancelled = false
+    adminAPI
+      .getServiceAreas({ zoneId: filters.zoneId })
+      .then((res) => {
+        if (cancelled) return
+        const list = res?.data?.data?.serviceAreas || []
+        setServiceAreas(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setServiceAreas([]))
+    return () => {
+      cancelled = true
+    }
+  }, [filters.zoneId])
 
   const limit = LIMIT
   const totalPages = Math.max(1, Math.ceil((total || 0) / limit))
@@ -99,6 +120,7 @@ export default function SupportTickets() {
         ...(toDate && { toDate }),
         ...(filters.source === "restaurant" && category && { category }),
         ...(filters.zoneId && { zoneId: filters.zoneId }),
+        ...(filters.zoneId && filters.serviceAreaId && { serviceAreaId: filters.serviceAreaId }),
       }
       const res = await supportAPI.getSupportTicketsAdmin(params)
       const data = res?.data?.data || res?.data || {}
@@ -137,7 +159,7 @@ export default function SupportTickets() {
       }
     }
     loadRef.current()
-  }, [page, debouncedSearch, filters.status, filters.type, filters.source, filters.zoneId, fromDate, toDate, category])
+  }, [page, debouncedSearch, filters.status, filters.type, filters.source, filters.zoneId, filters.serviceAreaId, fromDate, toDate, category])
 
   const resetPage = () => setPage(1)
 
@@ -277,7 +299,7 @@ export default function SupportTickets() {
               <select
                 value={filters.zoneId}
                 onChange={(e) => {
-                  setFilters((p) => ({ ...p, zoneId: e.target.value }))
+                  setFilters((p) => ({ ...p, zoneId: e.target.value, serviceAreaId: "" }))
                   resetPage()
                 }}
                 className="border border-slate-200 rounded-lg px-3 py-2 text-sm"
@@ -290,6 +312,24 @@ export default function SupportTickets() {
                   </option>
                 ))}
               </select>
+              {filters.zoneId && serviceAreas.length > 0 && (
+                <select
+                  value={filters.serviceAreaId}
+                  onChange={(e) => {
+                    setFilters((p) => ({ ...p, serviceAreaId: e.target.value }))
+                    resetPage()
+                  }}
+                  className="border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  title="Filter by service area"
+                >
+                  <option value="">All Service Areas</option>
+                  {serviceAreas.map((sa) => (
+                    <option key={sa._id} value={sa._id}>
+                      {sa.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 

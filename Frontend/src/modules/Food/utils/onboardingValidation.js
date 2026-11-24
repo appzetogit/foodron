@@ -45,7 +45,7 @@ export const isPointInPolygon = (lat, lng, polygon) => {
   return inside
 }
 
-export const validateOnboardingStep1 = (step1, zones = []) => {
+export const validateOnboardingStep1 = (step1, zones = [], serviceAreas = []) => {
   const errors = {}
 
   if (!step1.restaurantName?.trim()) {
@@ -108,6 +108,31 @@ export const validateOnboardingStep1 = (step1, zones = []) => {
       )
       if (!isInside) {
         errors.locationPin = "Selected address is outside the selected zone"
+      }
+    }
+  }
+
+  // Service area is required whenever the selected zone has at least one defined.
+  if (step1.zoneId && serviceAreas.length > 0) {
+    if (!step1.serviceAreaId?.trim()) {
+      errors.serviceAreaId = "Service area is required"
+    } else if (step1.location?.latitude && step1.location?.longitude) {
+      const selectedServiceArea = serviceAreas.find(
+        (s) => String(s._id || s.id) === step1.serviceAreaId,
+      )
+      if (
+        selectedServiceArea &&
+        Array.isArray(selectedServiceArea.coordinates) &&
+        selectedServiceArea.coordinates.length >= 3
+      ) {
+        const isInsideServiceArea = isPointInPolygon(
+          Number(step1.location.latitude),
+          Number(step1.location.longitude),
+          selectedServiceArea.coordinates,
+        )
+        if (!isInsideServiceArea) {
+          errors.locationPin = "Selected address is outside the selected service area"
+        }
       }
     }
   }

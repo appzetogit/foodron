@@ -132,6 +132,7 @@ export default function OnboardingLocationSection({
   onServiceAreaChange,
   onLocationChange,
   zoneError = "",
+  serviceAreaError = "",
   locationError = "",
 }) {
   const mapContainerRef = useRef(null)
@@ -640,7 +641,7 @@ export default function OnboardingLocationSection({
 
       {zoneSelected && serviceAreas.length > 0 && (
         <div>
-          <Label className={ONBOARDING_LABEL}>Service area (optional)</Label>
+          <Label className={ONBOARDING_LABEL}>Service area*</Label>
           <Select
             value={serviceAreaId || ""}
             onValueChange={(value) => {
@@ -649,9 +650,9 @@ export default function OnboardingLocationSection({
             }}
             disabled={serviceAreasLoading || !isEditing}
           >
-            <SelectTrigger className={`${ONBOARDING_INPUT} h-11`}>
+            <SelectTrigger className={serviceAreaError ? `${ONBOARDING_INPUT} h-11 border-red-400 ring-2 ring-red-200` : `${ONBOARDING_INPUT} h-11`}>
               <SelectValue
-                placeholder={serviceAreasLoading ? "Loading service areas..." : "Select a service area (optional)"}
+                placeholder={serviceAreasLoading ? "Loading service areas..." : "Select a service area"}
               />
             </SelectTrigger>
             <SelectContent className="max-h-60">
@@ -665,10 +666,14 @@ export default function OnboardingLocationSection({
               })}
             </SelectContent>
           </Select>
-          <p className={`${ONBOARDING_HINT} mt-2`}>
-            Optional. Narrows your pin to a smaller area inside the zone, only used to help
-            {" "}{`${selectedZone?.name || selectedZone?.zoneName || "the zone"}`}'s admin filter/report data.
-          </p>
+          {serviceAreaError ? (
+            <p className="mt-1.5 text-xs font-medium text-red-600">{serviceAreaError}</p>
+          ) : (
+            <p className={`${ONBOARDING_HINT} mt-2`}>
+              Your pin must fall inside the selected service area within
+              {" "}{`${selectedZone?.name || selectedZone?.zoneName || "the zone"}`}.
+            </p>
+          )}
         </div>
       )}
 

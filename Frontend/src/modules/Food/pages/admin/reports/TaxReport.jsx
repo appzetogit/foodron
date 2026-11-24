@@ -17,6 +17,7 @@ export default function TaxReport() {
     calculateTax: "Percentage",
     taxRate: "Select Tax Rate",
     zoneId: "",
+    serviceAreaId: "",
   })
   const [reports, setReports] = useState([])
   const [stats, setStats] = useState({
@@ -29,6 +30,7 @@ export default function TaxReport() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [reportDetail, setReportDetail] = useState(null)
   const [zones, setZones] = useState([])
+  const [serviceAreas, setServiceAreas] = useState([])
 
   useEffect(() => {
     adminAPI
@@ -39,6 +41,21 @@ export default function TaxReport() {
       })
       .catch(() => setZones([]))
   }, [])
+
+  // Fetch service areas for the selected zone (optional narrower filter)
+  useEffect(() => {
+    if (!filters.zoneId) {
+      setServiceAreas([])
+      return
+    }
+    adminAPI
+      .getServiceAreas({ zoneId: filters.zoneId })
+      .then((res) => {
+        const list = res?.data?.data?.serviceAreas || []
+        setServiceAreas(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setServiceAreas([]))
+  }, [filters.zoneId])
 
   const fetchTaxReport = async (overrideFilters = null) => {
     try {
@@ -75,6 +92,7 @@ export default function TaxReport() {
             ? activeFilters.taxRate
             : undefined,
         zoneId: activeFilters.zoneId || undefined,
+        serviceAreaId: activeFilters.zoneId && activeFilters.serviceAreaId ? activeFilters.serviceAreaId : undefined,
       }
 
       const response = await adminAPI.getTaxReport(params)
@@ -102,7 +120,7 @@ export default function TaxReport() {
 
   useEffect(() => {
     fetchTaxReport()
-  }, [filters.dateRangeType, filters.zoneId])
+  }, [filters.dateRangeType, filters.zoneId, filters.serviceAreaId])
 
   const handleReset = () => {
     const defaults = {
@@ -110,6 +128,7 @@ export default function TaxReport() {
       calculateTax: "Percentage",
       taxRate: "Select Tax Rate",
       zoneId: "",
+      serviceAreaId: "",
     }
     setFilters(defaults)
     fetchTaxReport(defaults)
@@ -225,7 +244,7 @@ export default function TaxReport() {
               </label>
               <select
                 value={filters.zoneId}
-                onChange={(e) => setFilters(prev => ({ ...prev, zoneId: e.target.value }))}
+                onChange={(e) => setFilters(prev => ({ ...prev, zoneId: e.target.value, serviceAreaId: "" }))}
                 className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">All Zones</option>
@@ -235,6 +254,25 @@ export default function TaxReport() {
               </select>
               <ChevronDown className="absolute right-2 bottom-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
             </div>
+
+            {filters.zoneId && serviceAreas.length > 0 && (
+              <div className="relative">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Service Area
+                </label>
+                <select
+                  value={filters.serviceAreaId}
+                  onChange={(e) => setFilters(prev => ({ ...prev, serviceAreaId: e.target.value }))}
+                  className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Service Areas</option>
+                  {serviceAreas.map((sa) => (
+                    <option key={sa._id} value={sa._id}>{sa.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 bottom-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
+              </div>
+            )}
 
             <div className="relative">
               <label className="block text-sm font-semibold text-slate-700 mb-2">

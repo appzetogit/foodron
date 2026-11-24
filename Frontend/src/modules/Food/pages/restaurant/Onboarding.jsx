@@ -565,6 +565,7 @@ export default function RestaurantOnboarding() {
   const [isFssaiCalendarOpen, setIsFssaiCalendarOpen] = useState(false)
   const [zones, setZones] = useState([])
   const [zonesLoading, setZonesLoading] = useState(false)
+  const [serviceAreas, setServiceAreas] = useState([])
 
   const [step1, setStep1] = useState(() => {
     const verified = resolveVerifiedOwnerPhone(
@@ -1189,6 +1190,7 @@ export default function RestaurantOnboarding() {
       ownerPhone: pickNonEmpty(step1.ownerPhone, draft?.ownerPhone, verifiedPhoneNumber),
       primaryContactNumber: pickNonEmpty(step1.primaryContactNumber, draft?.primaryContactNumber),
       zoneId: pickNonEmpty(normalizeZoneIdValue(step1.zoneId), normalizeZoneIdValue(draft?.zoneId)),
+      serviceAreaId: pickNonEmpty(normalizeZoneIdValue(step1.serviceAreaId), normalizeZoneIdValue(draft?.serviceAreaId)),
       location: {
         ...step1.location,
         formattedAddress: pickNonEmpty(step1.location?.formattedAddress, draftLocation.formattedAddress),
@@ -1248,7 +1250,7 @@ export default function RestaurantOnboarding() {
 
     let validationErrors = {}
     if (step === 1) {
-      validationErrors = validateOnboardingStep1(step1, zones)
+      validationErrors = validateOnboardingStep1(step1, zones, serviceAreas)
     } else if (step === 2) {
       validationErrors = validateOnboardingStep2(step2)
     } else if (step === 3) {
@@ -1794,6 +1796,7 @@ export default function RestaurantOnboarding() {
             onServiceAreaChange={handleServiceAreaChange}
             onLocationChange={handleLocationChange}
             zoneError={fieldErrors.zoneId}
+            serviceAreaError={fieldErrors.serviceAreaId}
             locationError={fieldErrors.locationPin}
           />
           <Input
@@ -1908,6 +1911,25 @@ export default function RestaurantOnboarding() {
       })
     return () => { cancelled = true }
   }, [])
+
+  // Service areas belong to one zone — refetch whenever the selected zone changes,
+  // so the step-1 "Next" validation can also enforce service-area requiredness/containment.
+  useEffect(() => {
+    if (!step1.zoneId) {
+      setServiceAreas([])
+      return
+    }
+    let cancelled = false
+    zoneAPI.getPublicServiceAreas(step1.zoneId)
+      .then((res) => {
+        const list = res?.data?.data?.serviceAreas || []
+        if (!cancelled) setServiceAreas(Array.isArray(list) ? list : [])
+      })
+      .catch(() => {
+        if (!cancelled) setServiceAreas([])
+      })
+    return () => { cancelled = true }
+  }, [step1.zoneId])
 
   // Backfill zone name when zones load after zoneId was restored from draft/local storage.
   useEffect(() => {

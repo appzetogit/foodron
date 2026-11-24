@@ -51,7 +51,7 @@ export const createFeedbackExperience = async (req, res) => {
  */
 export const getFeedbackExperiences = async (req, res) => {
     try {
-        const { module, page = 1, limit = 10, startDate, endDate, rating, experience, zoneId } = req.query;
+        const { module, page = 1, limit = 10, startDate, endDate, rating, experience, zoneId, serviceAreaId } = req.query;
         const query = {};
 
         if (module) {
@@ -59,7 +59,9 @@ export const getFeedbackExperiences = async (req, res) => {
         }
 
         if (zoneId) {
-            const zoneRestaurants = await FoodRestaurant.find({ zoneId }).select('_id').lean();
+            const zoneRestaurants = await FoodRestaurant.find({ zoneId, ...(serviceAreaId ? { serviceAreaId } : {}) })
+                .select('_id')
+                .lean();
             query.restaurantId = { $in: zoneRestaurants.map((r) => r._id) };
         }
 

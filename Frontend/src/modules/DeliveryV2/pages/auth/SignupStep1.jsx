@@ -4,7 +4,7 @@ import { ArrowLeft, Upload, X, Check, Camera, Image as ImageIcon, Truck, User, F
 import { toast } from "sonner"
 import { openCamera, openGallery } from "@food/utils/imageUploadUtils"
 import useDeliveryBackNavigation from "../../hooks/useDeliveryBackNavigation"
-import { deliveryAPI } from "@food/api"
+import { deliveryAPI, zoneAPI } from "@food/api"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
@@ -124,6 +124,27 @@ export default function SignupStep1() {
     }
   }, [])
 
+  const [zones, setZones] = useState([])
+  const [serviceAreas, setServiceAreas] = useState([])
+
+  useEffect(() => {
+    let cancelled = false
+    const loadZones = async () => {
+      try {
+        const res = await zoneAPI.getPublicZones()
+        const list = res?.data?.data?.zones || res?.data?.zones || []
+        if (!cancelled) setZones(Array.isArray(list) ? list : [])
+      } catch (err) {
+        debugError("Failed to load zones:", err)
+        if (!cancelled) setZones([])
+      }
+    }
+    loadZones()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const [formData, setFormData] = useState(() => {
     const saved = sessionStorage.getItem("deliverySignupDetails")
     const base = {
@@ -135,6 +156,8 @@ export default function SignupStep1() {
       address: "",
       city: "",
       state: "",
+      zoneId: "",
+      serviceAreaId: "",
       vehicles: [],
       drivingLicenseNumber: "",
       panNumber: "",
@@ -154,6 +177,28 @@ export default function SignupStep1() {
   })
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    if (!formData.zoneId) {
+      setServiceAreas([])
+      return
+    }
+    const loadServiceAreas = async () => {
+      try {
+        const res = await zoneAPI.getPublicServiceAreas(formData.zoneId)
+        const list = res?.data?.data?.serviceAreas || []
+        if (!cancelled) setServiceAreas(Array.isArray(list) ? list : [])
+      } catch (err) {
+        debugError("Failed to load service areas:", err)
+        if (!cancelled) setServiceAreas([])
+      }
+    }
+    loadServiceAreas()
+    return () => {
+      cancelled = true
+    }
+  }, [formData.zoneId])
   
   const [showAddVehicle, setShowAddVehicle] = useState(false)
   const [newVehicle, setNewVehicle] = useState({
@@ -298,7 +343,8 @@ export default function SignupStep1() {
 
     setFormData(prev => ({
       ...prev,
-      [name]: updatedValue
+      [name]: updatedValue,
+      ...(name === "zoneId" ? { serviceAreaId: "" } : {})
     }))
     // Clear error for this field
     if (errors[name]) {
@@ -336,6 +382,10 @@ export default function SignupStep1() {
       newErrors.state = "State is required"
     } else if (!isValidLocationValue(formData.state)) {
       newErrors.state = "State can contain letters only"
+    }
+
+    if (!formData.zoneId) {
+      newErrors.zoneId = "Zone is required"
     }
 
     if (formData.vehicles.length === 0) {
@@ -423,6 +473,8 @@ export default function SignupStep1() {
         address: formData.address.trim(),
         city: formData.city.trim(),
         state: formData.state.trim(),
+        zoneId: formData.zoneId,
+        serviceAreaId: formData.serviceAreaId || "",
         vehicles: formData.vehicles,
         drivingLicenseNumber: formData.drivingLicenseNumber.trim().toUpperCase(),
         panNumber: formData.panNumber.trim().toUpperCase(),
@@ -648,6 +700,57 @@ export default function SignupStep1() {
                 </div>
                 {errors.state && <p className="text-red-500 text-xs mt-1.5 ml-1 font-medium">{errors.state}</p>}
               </div>
+            </div>
+
+            {/* Zone and Service Area */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[13px] font-bold text-gray-700 mb-1.5 ml-1">
+                  Zone <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <select
+                    name="zoneId"
+                    value={formData.zoneId}
+                    onChange={handleChange}
+                    className={`w-full pl-3 pr-8 py-3 bg-gray-50 border rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00B761]/20 transition-colors font-medium text-gray-900 text-sm appearance-none ${
+                      errors.zoneId ? "border-red-500" : "border-gray-200 focus:border-[#00B761]"
+                    }`}
+                  >
+                    <option value="">Select zone</option>
+                    {zones.map((zone) => (
+                      <option key={zone._id} value={zone._id}>
+                        {zone.zoneName || zone.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+                {errors.zoneId && <p className="text-red-500 text-xs mt-1.5 ml-1 font-medium">{errors.zoneId}</p>}
+              </div>
+              {serviceAreas.length > 0 && (
+                <div>
+                  <label className="block text-[13px] font-bold text-gray-700 mb-1.5 ml-1">
+                    Service Area
+                  </label>
+                  <div className="relative">
+                    <select
+                      name="serviceAreaId"
+                      value={formData.serviceAreaId}
+                      onChange={handleChange}
+                      className="w-full pl-3 pr-8 py-3 bg-gray-50 border border-gray-200 focus:border-[#00B761] rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00B761]/20 transition-colors font-medium text-gray-900 text-sm appearance-none"
+                    >
+                      <option value="">Select (optional)</option>
+                      {serviceAreas.map((sa) => (
+                        <option key={sa._id} value={sa._id}>
+                          {sa.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* My Vehicles Section */}
