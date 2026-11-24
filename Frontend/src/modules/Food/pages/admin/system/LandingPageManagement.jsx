@@ -172,6 +172,10 @@ export default function LandingPageManagement() {
 
     return {
       ...additionalConfig,
+      // These /food/hero-banners* URLs have no "/admin/" segment, so the shared axios
+      // client's URL-based module guess falls through to "user" and overwrites this
+      // Authorization header with the wrong (or no) token. Force the module explicitly.
+      contextModule: "admin",
       headers: mergedHeaders,
     }
   }
