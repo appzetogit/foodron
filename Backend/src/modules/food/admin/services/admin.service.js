@@ -7930,20 +7930,47 @@ export async function getDeliveryPartnerById(id) {
     };
 }
 
-/** Admin: per-driver count of order offers they passed/declined, with search + pagination. */
+/** Admin: per-driver count of order offers they passed/declined, with search/date/zone filters + pagination. */
 export async function getDeliveryPartnerDeclineStats(query = {}) {
     const { page, limit, skip } = buildPaginationOptions(query);
     const search = String(query.search || '').trim();
+    const fromDate = query.fromDate ? new Date(query.fromDate) : null;
+    const toDate = query.toDate ? new Date(query.toDate) : null;
+    if (toDate) toDate.setHours(23, 59, 59, 999);
+    const zoneId = query.zoneId && mongoose.Types.ObjectId.isValid(String(query.zoneId))
+        ? new mongoose.Types.ObjectId(String(query.zoneId))
+        : null;
+    const serviceAreaId = query.serviceAreaId && mongoose.Types.ObjectId.isValid(String(query.serviceAreaId))
+        ? new mongoose.Types.ObjectId(String(query.serviceAreaId))
+        : null;
+
+    // Narrow by zone/service-area first, since offeredTo only stores partnerId.
+    let zoneFilteredPartnerIds = null;
+    if (zoneId) {
+        const partnerFilter = { zoneId };
+        if (serviceAreaId) partnerFilter.serviceAreaId = serviceAreaId;
+        zoneFilteredPartnerIds = await FoodDeliveryPartner.find(partnerFilter).distinct('_id');
+    }
+
+    const offerMatch = { action: 'rejected' };
+    if (fromDate || toDate) {
+        offerMatch.at = {};
+        if (fromDate && !Number.isNaN(fromDate.getTime())) offerMatch.at.$gte = fromDate;
+        if (toDate && !Number.isNaN(toDate.getTime())) offerMatch.at.$lte = toDate;
+    }
+    if (zoneFilteredPartnerIds) offerMatch.partnerId = { $in: zoneFilteredPartnerIds };
 
     const counts = await FoodOrder.aggregate([
         { $match: { 'dispatch.offeredTo.action': 'rejected' } },
         { $unwind: '$dispatch.offeredTo' },
         { $match: { 'dispatch.offeredTo.action': 'rejected' } },
+        { $replaceWith: '$dispatch.offeredTo' },
+        { $match: offerMatch },
         {
             $group: {
-                _id: '$dispatch.offeredTo.partnerId',
+                _id: '$partnerId',
                 declineCount: { $sum: 1 },
-                lastDeclineAt: { $max: '$dispatch.offeredTo.at' },
+                lastDeclineAt: { $max: '$at' },
             },
         },
         { $sort: { declineCount: -1 } },
@@ -7952,7 +7979,9 @@ export async function getDeliveryPartnerDeclineStats(query = {}) {
     const partnerIds = counts.map((c) => c._id).filter(Boolean);
     const partners = partnerIds.length
         ? await FoodDeliveryPartner.find({ _id: { $in: partnerIds } })
-            .select('name phone profilePhoto vehicleType')
+            .select('name phone profilePhoto vehicleType zoneId serviceAreaId')
+            .populate('zoneId', 'name zoneName')
+            .populate('serviceAreaId', 'name')
             .lean()
         : [];
     const partnerMap = new Map(partners.map((p) => [String(p._id), p]));
@@ -7965,6 +7994,8 @@ export async function getDeliveryPartnerDeclineStats(query = {}) {
             phone: partner?.phone || '',
             profilePhoto: partner?.profilePhoto || '',
             vehicleType: partner?.vehicleType || '',
+            zoneName: partner?.zoneId?.name || partner?.zoneId?.zoneName || '',
+            serviceAreaName: partner?.serviceAreaId?.name || '',
             declineCount: c.declineCount,
             lastDeclineAt: c.lastDeclineAt,
         };
@@ -7979,8 +8010,12 @@ export async function getDeliveryPartnerDeclineStats(query = {}) {
 
     const total = rows.length;
     const pageRows = rows.slice(skip, skip + limit);
+    const summary = {
+        totalDeclines: rows.reduce((sum, r) => sum + r.declineCount, 0),
+        totalDrivers: rows.length,
+    };
 
-    return buildPaginatedResult({ docs: pageRows, total, page, limit });
+    return { ...buildPaginatedResult({ docs: pageRows, total, page, limit }), summary };
 }
 
 /** Admin: the actual decline reasons a specific driver gave, newest first. */
