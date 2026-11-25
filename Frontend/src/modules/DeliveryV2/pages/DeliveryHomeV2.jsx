@@ -262,7 +262,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   const [showVehicleSwitcher, setShowVehicleSwitcher] = useState(false);
   const [vehicleSelectMode, setVehicleSelectMode] = useState('switch');
   const { isWithinRange, distanceToTarget, displayDistanceToTarget } = useProximityCheck();
-  const { acceptOrder, reachPickup, pickUpOrder, reachDrop, completeDelivery, resetTrip } = useOrderManager();
+  const { acceptOrder, reachPickup, pickUpOrder, reachDrop, completeDelivery, resetTrip, rejectOrder } = useOrderManager();
   const { newOrder, clearNewOrder, unavailableOfferKey, resetOfferQueue, orderStatusUpdate, clearOrderStatusUpdate, isConnected: isSocketConnected, emitLocation, forcedOfflineEvent, clearForcedOfflineEvent } = useDeliveryNotificationsContext();
   const [isProcessingToggle, setIsProcessingToggle] = useState(false);
 
@@ -1311,7 +1311,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                 key={`new-order-modal-${getIncomingOfferKey(incomingOrder) || 'current'}`}
                 order={incomingOrder} 
                 onAccept={(o) => { acceptOrder(o); setIncomingOrder(null); clearNewOrder(); }}
-                onReject={() => { setIncomingOrder(null); clearNewOrder(); }}
+                onReject={(reason) => { rejectOrder(incomingOrder, reason); setIncomingOrder(null); clearNewOrder(); }}
                 onMinimize={() => setIsModalMinimized(true)}
               />
             )}

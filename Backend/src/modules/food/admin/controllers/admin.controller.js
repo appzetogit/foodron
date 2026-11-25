@@ -1490,6 +1490,32 @@ export async function getDeliveryPartnerById(req, res, next) {
     }
 }
 
+export async function getDeliveryPartnerDeclineStats(req, res, next) {
+    try {
+        const result = await adminService.getDeliveryPartnerDeclineStats(req.query);
+        res.status(200).json({
+            success: true,
+            message: 'Delivery partner decline stats fetched successfully',
+            data: result
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function getDeliveryPartnerDeclineReasons(req, res, next) {
+    try {
+        const result = await adminService.getDeliveryPartnerDeclineReasons(req.params.id, req.query);
+        res.status(200).json({
+            success: true,
+            message: 'Delivery partner decline reasons fetched successfully',
+            data: result
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export async function createDeliveryPartner(req, res, next) {
     try {
         const { validateDeliveryRegisterDto } = await import(

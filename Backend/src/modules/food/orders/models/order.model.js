@@ -237,7 +237,10 @@ const dispatchSchema = new mongoose.Schema(
         offeredTo: [{
             partnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodDeliveryPartner' },
             at: { type: Date, default: Date.now },
-            action: { type: String, enum: ['offered', 'rejected', 'timeout'], default: 'offered' }
+            action: { type: String, enum: ['offered', 'accepted', 'rejected', 'timeout'], default: 'offered' },
+            respondedAt: { type: Date, default: null },
+            /** Why the driver passed this order — picked reason, or their own typed text. */
+            reason: { type: String, default: '', trim: true, maxlength: 300 }
         }],
         /** Seconds the DP offer modal should count down (Food Quick uses shorter window). */
         offerTimeoutSec: { type: Number, default: null, min: 10, max: 180 },

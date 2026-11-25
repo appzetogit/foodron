@@ -278,6 +278,8 @@ router.post(
     },
     adminController.createDeliveryPartner
 );
+router.get('/delivery/decline-stats', checkPermission('food::deliveryman_management::deliveryman::list', 'view'), adminController.getDeliveryPartnerDeclineStats);
+router.get('/delivery/:id/decline-reasons', checkPermission('food::deliveryman_management::deliveryman::list', 'view'), adminController.getDeliveryPartnerDeclineReasons);
 router.get('/delivery/:id', checkPermission('food::deliveryman_management::deliveryman::list', 'view'), adminController.getDeliveryPartnerById);
 router.patch('/delivery/:id/approve', checkPermission('food::deliveryman_management::deliveryman::join_request', 'edit'), adminController.approveDeliveryPartner);
 router.patch('/delivery/:id/reject', checkPermission('food::deliveryman_management::deliveryman::join_request', 'edit'), adminController.rejectDeliveryPartner);

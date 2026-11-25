@@ -478,6 +478,12 @@ export const adminAPI = {
     }),
   getDeliveryPartnerById: (id) =>
     apiClient.get(`/food/admin/delivery/${id}`, { contextModule: "admin" }),
+  /** Per-driver count of order offers they passed/declined. */
+  getDeliveryPartnerDeclineStats: (params = {}) =>
+    apiClient.get("/food/admin/delivery/decline-stats", { params, contextModule: "admin" }),
+  /** The actual decline reasons a specific driver gave, newest first. */
+  getDeliveryPartnerDeclineReasons: (id, params = {}) =>
+    apiClient.get(`/food/admin/delivery/${id}/decline-reasons`, { params, contextModule: "admin" }),
   approveDeliveryPartner: (id) =>
     apiClient.patch(
       `/food/admin/delivery/${String(id)}/approve`,

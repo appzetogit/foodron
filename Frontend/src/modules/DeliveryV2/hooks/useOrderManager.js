@@ -264,6 +264,16 @@ export const useOrderManager = () => {
     void refreshActiveTrip('complete');
   };
 
+  const rejectOrder = async (order, reason) => {
+    const orderId = getDeliveryDocumentId(order);
+    if (!orderId) return;
+    try {
+      await deliveryAPI.rejectOrder(orderId, { reason: reason || '' });
+    } catch (error) {
+      console.error('[OrderManager] Failed to reject order:', error);
+    }
+  };
+
   return {
     acceptOrder,
     reachPickup,
@@ -271,5 +281,6 @@ export const useOrderManager = () => {
     reachDrop,
     completeDelivery,
     resetTrip,
+    rejectOrder,
   };
 };

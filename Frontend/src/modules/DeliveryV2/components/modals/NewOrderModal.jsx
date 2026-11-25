@@ -11,8 +11,18 @@ import { RenderNewOrder } from './renderers/NewOrderRenderers';
  * NewOrderModal - Ported to Original 1:1 Theme with Slider Accept.
  * Matches the Zomato/Swiggy style Green Header + White Card.
  */
+const DECLINE_REASONS = [
+  'Too far from my location',
+  'Vehicle/bike issue',
+  'Already have another order',
+  'Payout too low',
+];
+
 export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
   const { riderLocation, setRiderLocation } = useDeliveryStore();
+  const [showDeclineSheet, setShowDeclineSheet] = useState(false);
+  const [declineReason, setDeclineReason] = useState('');
+  const [declineOtherText, setDeclineOtherText] = useState('');
   const isFoodQuick =
     order?.isFoodQuickDelivery === true ||
     String(order?.deliveryMode || '').toLowerCase() === 'quick';
@@ -299,13 +309,82 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
           />
 
           <button
-            onClick={onReject}
+            onClick={() => setShowDeclineSheet(true)}
             className="w-full text-gray-400 font-bold text-[9px] uppercase tracking-widest hover:text-red-500 transition-colors py-1 active:scale-95"
           >
             Pass this task
           </button>
         </div>
       </motion.div>
+
+      <AnimatePresence>
+        {showDeclineSheet && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[310] bg-black/70 flex items-end justify-center"
+            onClick={() => setShowDeclineSheet(false)}
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              className="w-full max-w-lg bg-white rounded-t-3xl p-5 pb-8 space-y-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-base font-bold text-gray-900">Why are you passing this order?</h3>
+              <div className="space-y-2">
+                {DECLINE_REASONS.map((reason) => (
+                  <button
+                    key={reason}
+                    onClick={() => setDeclineReason(reason)}
+                    className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm font-medium transition-colors ${declineReason === reason
+                      ? 'border-black bg-black/5 text-black'
+                      : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                  >
+                    {reason}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setDeclineReason('Other')}
+                  className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm font-medium transition-colors ${declineReason === 'Other'
+                    ? 'border-black bg-black/5 text-black'
+                    : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  Other
+                </button>
+                {declineReason === 'Other' && (
+                  <textarea
+                    value={declineOtherText}
+                    onChange={(e) => setDeclineOtherText(e.target.value)}
+                    placeholder="Please specify your reason"
+                    rows={3}
+                    autoFocus
+                    className="w-full p-3 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-black"
+                  />
+                )}
+              </div>
+              <button
+                disabled={!declineReason || (declineReason === 'Other' && !declineOtherText.trim())}
+                onClick={() => {
+                  const finalReason = declineReason === 'Other' ? declineOtherText.trim() : declineReason;
+                  setShowDeclineSheet(false);
+                  onReject(finalReason);
+                }}
+                className={`w-full py-3.5 rounded-xl font-bold text-sm transition-colors ${declineReason && !(declineReason === 'Other' && !declineOtherText.trim())
+                  ? 'bg-red-600 text-white'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+              >
+                Confirm Pass
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

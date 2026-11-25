@@ -53,7 +53,7 @@ import { buildOrderIdentityFilter } from '../../orders/services/order.helpers.js
 import { FoodRestaurantWithdrawal } from '../../restaurant/models/foodRestaurantWithdrawal.model.js';
 import { getAdRevenueForDashboard } from './advertisementBilling.service.js';
 import { applyPendingOpenDaysUpdate, discardPendingOpenDaysUpdate, syncOutletTimingsFromOpenDays } from '../../restaurant/services/outletTimings.service.js';
-import { buildPaginationMeta, buildPaginationOptions } from '../../../../utils/helpers.js';
+import { buildPaginationMeta, buildPaginationOptions, buildPaginatedResult } from '../../../../utils/helpers.js';
 // import { applyPendingOpenDaysUpdate, discardPendingOpenDaysUpdate } from '../../restaurant/services/outletTimings.service.js';
 import {
     buildApplyPendingProfileChangesUpdate,
@@ -7928,6 +7928,111 @@ export async function getDeliveryPartnerById(id) {
             }
             : null
     };
+}
+
+/** Admin: per-driver count of order offers they passed/declined, with search + pagination. */
+export async function getDeliveryPartnerDeclineStats(query = {}) {
+    const { page, limit, skip } = buildPaginationOptions(query);
+    const search = String(query.search || '').trim();
+
+    const counts = await FoodOrder.aggregate([
+        { $match: { 'dispatch.offeredTo.action': 'rejected' } },
+        { $unwind: '$dispatch.offeredTo' },
+        { $match: { 'dispatch.offeredTo.action': 'rejected' } },
+        {
+            $group: {
+                _id: '$dispatch.offeredTo.partnerId',
+                declineCount: { $sum: 1 },
+                lastDeclineAt: { $max: '$dispatch.offeredTo.at' },
+            },
+        },
+        { $sort: { declineCount: -1 } },
+    ]);
+
+    const partnerIds = counts.map((c) => c._id).filter(Boolean);
+    const partners = partnerIds.length
+        ? await FoodDeliveryPartner.find({ _id: { $in: partnerIds } })
+            .select('name phone profilePhoto vehicleType')
+            .lean()
+        : [];
+    const partnerMap = new Map(partners.map((p) => [String(p._id), p]));
+
+    let rows = counts.map((c) => {
+        const partner = partnerMap.get(String(c._id)) || null;
+        return {
+            partnerId: String(c._id),
+            name: partner?.name || 'N/A',
+            phone: partner?.phone || '',
+            profilePhoto: partner?.profilePhoto || '',
+            vehicleType: partner?.vehicleType || '',
+            declineCount: c.declineCount,
+            lastDeclineAt: c.lastDeclineAt,
+        };
+    });
+
+    if (search) {
+        const term = search.toLowerCase();
+        rows = rows.filter(
+            (r) => r.name.toLowerCase().includes(term) || r.phone.includes(term),
+        );
+    }
+
+    const total = rows.length;
+    const pageRows = rows.slice(skip, skip + limit);
+
+    return buildPaginatedResult({ docs: pageRows, total, page, limit });
+}
+
+/** Admin: the actual decline reasons a specific driver gave, newest first. */
+export async function getDeliveryPartnerDeclineReasons(partnerId, query = {}) {
+    const { page, limit, skip } = buildPaginationOptions(query);
+    if (!partnerId || !mongoose.Types.ObjectId.isValid(partnerId)) {
+        return buildPaginatedResult({ docs: [], total: 0, page, limit });
+    }
+    const objectId = new mongoose.Types.ObjectId(partnerId);
+
+    const rows = await FoodOrder.aggregate([
+        { $match: { 'dispatch.offeredTo': { $elemMatch: { partnerId: objectId, action: 'rejected' } } } },
+        { $unwind: '$dispatch.offeredTo' },
+        { $match: { 'dispatch.offeredTo.partnerId': objectId, 'dispatch.offeredTo.action': 'rejected' } },
+        { $sort: { 'dispatch.offeredTo.at': -1 } },
+        {
+            $project: {
+                _id: 0,
+                orderId: '$orderId',
+                orderMongoId: '$_id',
+                restaurantId: '$restaurantId',
+                at: '$dispatch.offeredTo.at',
+                reason: '$dispatch.offeredTo.reason',
+            },
+        },
+        { $skip: skip },
+        { $limit: limit },
+    ]);
+
+    const totalCountArr = await FoodOrder.aggregate([
+        { $match: { 'dispatch.offeredTo': { $elemMatch: { partnerId: objectId, action: 'rejected' } } } },
+        { $unwind: '$dispatch.offeredTo' },
+        { $match: { 'dispatch.offeredTo.partnerId': objectId, 'dispatch.offeredTo.action': 'rejected' } },
+        { $count: 'total' },
+    ]);
+    const total = totalCountArr[0]?.total || 0;
+
+    const restaurantIds = [...new Set(rows.map((r) => String(r.restaurantId)).filter(Boolean))];
+    const restaurants = restaurantIds.length
+        ? await FoodRestaurant.find({ _id: { $in: restaurantIds } }).select('restaurantName').lean()
+        : [];
+    const restaurantMap = new Map(restaurants.map((r) => [String(r._id), r.restaurantName]));
+
+    const docs = rows.map((r) => ({
+        orderId: r.orderId,
+        orderMongoId: String(r.orderMongoId),
+        restaurantName: restaurantMap.get(String(r.restaurantId)) || 'N/A',
+        at: r.at,
+        reason: r.reason || '',
+    }));
+
+    return buildPaginatedResult({ docs, total, page, limit });
 }
 
 export async function getDeliverymanReviews(query = {}) {

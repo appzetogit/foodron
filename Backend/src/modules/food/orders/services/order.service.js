@@ -5380,6 +5380,7 @@ export async function rejectOrderDelivery(orderId, deliveryPartnerId, body = {})
       const assignedLeg = getAssignedDispatchLeg(order, deliveryPartnerId);
       if (!assignedLeg) throw new ForbiddenError('No split dispatch leg assigned to you');
 
+      const splitReason = String(body?.reason || '').trim().slice(0, 300);
       assignedLeg.deliveryPartnerId = null;
       assignedLeg.assignedAt = null;
       assignedLeg.partnerCandidates = (assignedLeg.partnerCandidates || []).filter(
@@ -5401,22 +5402,30 @@ export async function rejectOrderDelivery(orderId, deliveryPartnerId, body = {})
         byId: deliveryPartnerId,
         from: 'assigned',
         to: order.dispatch.status,
-        note: `Rejected split dispatch leg ${assignedLeg.legId}`,
+        note: splitReason
+          ? `Rejected split dispatch leg ${assignedLeg.legId}: ${splitReason}`
+          : `Rejected split dispatch leg ${assignedLeg.legId}`,
       });
       await order.save();
       return getOrderById(order._id, { deliveryPartnerId });
     }
 
     if (order.dispatch.deliveryPartnerId?.toString() !== deliveryPartnerId.toString()) throw new ForbiddenError('Not your order');
-    
+
+    const reason = String(body?.reason || '').trim().slice(0, 300);
+
     const offer = order.dispatch.offeredTo.find(o => String(o.partnerId) === String(deliveryPartnerId) && o.action === 'offered');
-    if (offer) offer.action = 'rejected';
+    if (offer) {
+        offer.action = 'rejected';
+        offer.respondedAt = new Date();
+        offer.reason = reason;
+    }
 
     order.dispatch.status = 'unassigned';
     order.dispatch.deliveryPartnerId = undefined;
     order.dispatch.assignedAt = undefined;
     order.dispatch.acceptedAt = undefined;
-    pushStatusHistory(order, { byRole: 'DELIVERY_PARTNER', byId: deliveryPartnerId, from: 'assigned', to: 'unassigned', note: 'Rejected' });
+    pushStatusHistory(order, { byRole: 'DELIVERY_PARTNER', byId: deliveryPartnerId, from: 'assigned', to: 'unassigned', note: reason ? `Rejected: ${reason}` : 'Rejected' });
     await order.save();
     
     enqueueOrderEvent('delivery_rejected', {
