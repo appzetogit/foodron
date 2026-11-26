@@ -5410,31 +5410,47 @@ export async function rejectOrderDelivery(orderId, deliveryPartnerId, body = {})
       return getOrderById(order._id, { deliveryPartnerId });
     }
 
-    if (order.dispatch.deliveryPartnerId?.toString() !== deliveryPartnerId.toString()) throw new ForbiddenError('Not your order');
-
     const reason = String(body?.reason || '').trim().slice(0, 300);
 
     const offer = order.dispatch.offeredTo.find(o => String(o.partnerId) === String(deliveryPartnerId) && o.action === 'offered');
+    const isCurrentlyAssignedToMe = order.dispatch.deliveryPartnerId?.toString() === deliveryPartnerId.toString();
+
+    // In broadcast dispatch, several partners get an "offered" entry at once with
+    // dispatch.deliveryPartnerId still null — any of them must be able to decline
+    // their own offer without being the (not-yet-decided) assignee.
+    if (!isCurrentlyAssignedToMe && !offer) throw new ForbiddenError('Not your order');
+
     if (offer) {
         offer.action = 'rejected';
         offer.respondedAt = new Date();
         offer.reason = reason;
     }
 
-    order.dispatch.status = 'unassigned';
-    order.dispatch.deliveryPartnerId = undefined;
-    order.dispatch.assignedAt = undefined;
-    order.dispatch.acceptedAt = undefined;
-    pushStatusHistory(order, { byRole: 'DELIVERY_PARTNER', byId: deliveryPartnerId, from: 'assigned', to: 'unassigned', note: reason ? `Rejected: ${reason}` : 'Rejected' });
+    if (isCurrentlyAssignedToMe) {
+        // Sequential mode / already won the race — resetting dispatch frees it up for reassignment.
+        order.dispatch.status = 'unassigned';
+        order.dispatch.deliveryPartnerId = undefined;
+        order.dispatch.assignedAt = undefined;
+        order.dispatch.acceptedAt = undefined;
+        pushStatusHistory(order, { byRole: 'DELIVERY_PARTNER', byId: deliveryPartnerId, from: 'assigned', to: 'unassigned', note: reason ? `Rejected: ${reason}` : 'Rejected' });
+    } else {
+        // Broadcast mode, nobody has accepted yet — leave shared dispatch state alone,
+        // just record that this one partner passed on it.
+        pushStatusHistory(order, { byRole: 'DELIVERY_PARTNER', byId: deliveryPartnerId, from: order.dispatch.status, to: order.dispatch.status, note: reason ? `Passed: ${reason}` : 'Passed' });
+    }
     await order.save();
-    
+
     enqueueOrderEvent('delivery_rejected', {
         orderMongoId: order._id?.toString?.(),
         orderId: order.orderId,
         deliveryPartnerId
     });
 
-    void tryAutoAssign(order._id).catch(err => logger.error(`SmartDispatch: Auto-assign after reject failed: ${err.message}`));
+    // Only re-trigger the hunt ourselves if we were the assignee and nobody else is being hunted for already;
+    // in broadcast mode the hunt for other recipients is already live, so skip a redundant re-dispatch.
+    if (isCurrentlyAssignedToMe) {
+        void tryAutoAssign(order._id).catch(err => logger.error(`SmartDispatch: Auto-assign after reject failed: ${err.message}`));
+    }
 
     return order.toObject();
 }
